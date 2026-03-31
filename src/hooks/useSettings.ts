@@ -58,8 +58,7 @@ export function useUpdateSettings() {
     mutationFn: async (data: Partial<AppSettings>) => {
       const { error } = await supabase
         .from("app_settings")
-        .upsert({ id: 1, ...data, updated_at: new Date().toISOString() })
-        .eq("id", 1);
+        .upsert({ id: 1, ...data, updated_at: new Date().toISOString() });
 
       if (error) {
         console.error("Erro ao salvar configurações:", error);
