@@ -1,0 +1,265 @@
+@import url('https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 220 14% 96%;
+    --foreground: 0 0% 9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 9%;
+
+    --primary: 0 0% 9%;
+    --primary-foreground: 0 0% 98%;
+
+    --secondary: 220 14% 94%;
+    --secondary-foreground: 0 0% 9%;
+
+    --muted: 220 12% 91%;
+    --muted-foreground: 220 8% 46%;
+
+    --accent: 42 100% 50%;
+    --accent-foreground: 0 0% 9%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 220 13% 90%;
+    --input: 220 13% 90%;
+    --ring: 0 0% 9%;
+
+    --radius: 0.75rem;
+
+    --sidebar-bg: 0 0% 100%;
+    --sidebar-fg: 220 8% 46%;
+    --sidebar-active: 0 0% 9%;
+    --sidebar-hover: 220 14% 96%;
+    --sidebar-accent: 42 100% 50%;
+    --sidebar-width: 240px;
+
+    --success: 152 60% 45%;
+    --success-foreground: 0 0% 100%;
+    --warning: 42 100% 50%;
+    --warning-foreground: 0 0% 9%;
+    --info: 220 90% 56%;
+    --info-foreground: 0 0% 100%;
+
+    --lead-hot: 0 72% 51%;
+    --lead-warm: 38 92% 50%;
+    --lead-cold: 220 90% 56%;
+
+    --sidebar-background: 0 0% 5%;
+    --sidebar-foreground: 0 0% 60%;
+    --sidebar-primary: 0 0% 100%;
+    --sidebar-primary-foreground: 0 0% 5%;
+    --sidebar-accent: 42 100% 50%;
+    --sidebar-accent-foreground: 0 0% 5%;
+    --sidebar-border: 0 0% 12%;
+    --sidebar-ring: 42 100% 50%;
+
+    --glass: 0 0% 100% / 0.65;
+    --glass-border: 0 0% 100% / 0.35;
+    --glass-shadow: 0 8px 32px hsl(0 0% 0% / 0.06);
+  }
+
+  .dark {
+    --background: 0 0% 4%;
+    --foreground: 0 0% 95%;
+    --card: 0 0% 7%;
+    --card-foreground: 0 0% 95%;
+    --popover: 0 0% 7%;
+    --popover-foreground: 0 0% 95%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 0 0% 9%;
+    --secondary: 0 0% 12%;
+    --secondary-foreground: 0 0% 95%;
+    --muted: 0 0% 14%;
+    --muted-foreground: 0 0% 55%;
+    --accent: 42 100% 50%;
+    --accent-foreground: 0 0% 9%;
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 0 0% 95%;
+    --border: 0 0% 15%;
+    --input: 0 0% 15%;
+    --ring: 0 0% 80%;
+    --glass: 0 0% 8% / 0.7;
+    --glass-border: 0 0% 20% / 0.3;
+    --glass-shadow: 0 8px 32px hsl(0 0% 0% / 0.3);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    letter-spacing: -0.01em;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    letter-spacing: -0.025em;
+  }
+}
+
+@layer components {
+  /* Sidebar */
+  .sidebar-link {
+    @apply flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200;
+    color: hsl(var(--sidebar-fg));
+  }
+  .sidebar-link:hover {
+    background: hsl(var(--sidebar-hover));
+    color: hsl(var(--sidebar-active));
+    transform: translateX(2px);
+  }
+  .sidebar-link.active {
+    background: hsl(var(--sidebar-hover));
+    color: hsl(var(--sidebar-active));
+  }
+
+  /* Lead Badges */
+  .lead-badge-hot {
+    @apply text-xs font-semibold px-2.5 py-1 rounded-full;
+    background: hsl(var(--lead-hot) / 0.1);
+    color: hsl(var(--lead-hot));
+  }
+  .lead-badge-warm {
+    @apply text-xs font-semibold px-2.5 py-1 rounded-full;
+    background: hsl(var(--lead-warm) / 0.1);
+    color: hsl(var(--lead-warm));
+  }
+  .lead-badge-cold {
+    @apply text-xs font-semibold px-2.5 py-1 rounded-full;
+    background: hsl(var(--lead-cold) / 0.1);
+    color: hsl(var(--lead-cold));
+  }
+
+  /* Glass Card - primary card style */
+  .glass-card {
+    background: hsl(var(--glass));
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid hsl(var(--glass-border));
+    box-shadow: var(--glass-shadow);
+    @apply rounded-2xl transition-all duration-300;
+  }
+  .glass-card:hover {
+    box-shadow: 0 12px 40px hsl(0 0% 0% / 0.08);
+    transform: translateY(-1px);
+  }
+
+  /* Stat Card */
+  .stat-card {
+    background: hsl(var(--glass));
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid hsl(var(--glass-border));
+    box-shadow: var(--glass-shadow);
+    @apply rounded-2xl p-6 transition-all duration-300;
+  }
+  .stat-card:hover {
+    box-shadow: 0 12px 40px hsl(0 0% 0% / 0.08);
+    transform: translateY(-1px);
+  }
+
+  /* Kanban */
+  .kanban-column {
+    @apply rounded-2xl p-4 min-w-[300px] flex flex-col;
+    background: hsl(var(--muted) / 0.6);
+    backdrop-filter: blur(12px);
+  }
+  .kanban-card {
+    background: hsl(var(--glass));
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid hsl(var(--glass-border));
+    box-shadow: 0 2px 8px hsl(0 0% 0% / 0.04);
+    @apply rounded-xl p-4 cursor-grab transition-all duration-200;
+  }
+  .kanban-card:hover {
+    box-shadow: 0 8px 30px hsl(0 0% 0% / 0.08);
+    transform: translateY(-2px);
+  }
+
+  /* Chat Bubbles */
+  .chat-bubble-inbound {
+    background: hsl(var(--glass));
+    backdrop-filter: blur(20px);
+    border: 1px solid hsl(var(--glass-border));
+    @apply rounded-2xl rounded-bl-md px-4 py-3 max-w-[75%];
+    box-shadow: 0 2px 8px hsl(0 0% 0% / 0.04);
+  }
+  .chat-bubble-outbound {
+    @apply rounded-2xl rounded-br-md px-4 py-3 max-w-[75%];
+    background: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+    box-shadow: 0 4px 12px hsl(0 0% 0% / 0.1);
+  }
+
+  /* Page Header */
+  .page-header {
+    @apply mb-8;
+  }
+  .page-header h1 {
+    @apply text-2xl font-bold tracking-tight text-foreground;
+  }
+  .page-header p {
+    @apply text-sm text-muted-foreground mt-1;
+  }
+
+  /* Filter Pill */
+  .filter-pill {
+    @apply px-4 py-2 text-sm font-medium rounded-full border transition-all duration-200 cursor-pointer;
+    backdrop-filter: blur(12px);
+  }
+  .filter-pill.active {
+    @apply bg-primary text-primary-foreground border-primary;
+    box-shadow: 0 2px 8px hsl(0 0% 0% / 0.15);
+  }
+  .filter-pill:not(.active) {
+    background: hsl(var(--glass));
+    border-color: hsl(var(--glass-border));
+    @apply text-muted-foreground hover:text-foreground;
+  }
+  .filter-pill:not(.active):hover {
+    box-shadow: 0 2px 8px hsl(0 0% 0% / 0.06);
+  }
+
+  /* Glass Panel - for sidebars / panels */
+  .glass-panel {
+    background: hsl(var(--glass));
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid hsl(var(--glass-border));
+  }
+
+  /* Glass Input */
+  .glass-input {
+    background: hsl(var(--glass));
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid hsl(var(--glass-border));
+    @apply rounded-xl transition-all duration-200;
+  }
+  .glass-input:focus-within {
+    box-shadow: 0 0 0 2px hsl(var(--accent) / 0.2);
+    border-color: hsl(var(--accent) / 0.4);
+  }
+
+  /* Glass Table */
+  .glass-table-row {
+    @apply transition-all duration-200;
+  }
+  .glass-table-row:hover {
+    background: hsl(var(--glass));
+  }
+}

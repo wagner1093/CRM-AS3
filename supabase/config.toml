@@ -1,0 +1,10 @@
+project_id = "oxisdjygwxhikkixqpap"
+
+[functions.whatsapp-webhook]
+verify_jwt = false
+
+[functions.whatsapp-send]
+verify_jwt = false
+
+[functions.studio-ia-process]
+verify_jwt = false
