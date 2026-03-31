@@ -1,22 +1,25 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
-import { User, Bell, Shield, Palette, MessageSquare, Car, CreditCard, Globe, Zap, Mail } from "lucide-react";
+import { User, Bell, Shield, Palette, MessageSquare, Car, CreditCard, Globe, Zap, Mail, Loader2 } from "lucide-react";
+import { useSettings, useUpdateSettings, AppSettings } from "@/hooks/useSettings";
 
 const SettingsPage = () => {
-  const { toast } = useToast();
+  const { data: settings, isLoading } = useSettings();
+  const updateSettings = useUpdateSettings();
 
   // Profile
-  const [profileName, setProfileName] = useState("Admin AutoCRM");
-  const [profileEmail, setProfileEmail] = useState("admin@autocrm.com");
-  const [profilePhone, setProfilePhone] = useState("+55 11 99900-0000");
-  const [companyName, setCompanyName] = useState("AutoCRM Veículos");
-  const [companyDoc, setCompanyDoc] = useState("12.345.678/0001-99");
+  const [profileName, setProfileName] = useState("");
+  const [profileEmail, setProfileEmail] = useState("");
+  const [profilePhone, setProfilePhone] = useState("");
+  const [companyName, setCompanyName] = useState("");
+  const [companyDoc, setCompanyDoc] = useState("");
+  const [companyAddress, setCompanyAddress] = useState("");
+  const [companySite, setCompanySite] = useState("");
 
   // Notifications
   const [notifNewLead, setNotifNewLead] = useState(true);
@@ -36,11 +39,85 @@ const SettingsPage = () => {
   // Sales
   const [defaultCommission, setDefaultCommission] = useState("2.5");
   const [currency, setCurrency] = useState("BRL");
+  const [salesGoal, setSalesGoal] = useState("500000");
+  const [leadsGoal, setLeadsGoal] = useState("150");
   const [taxIncluded, setTaxIncluded] = useState(true);
 
+  // Sync state from DB on load
+  useEffect(() => {
+    if (settings) {
+      setProfileName(settings.profile_name || "");
+      setProfileEmail(settings.profile_email || "");
+      setProfilePhone(settings.profile_phone || "");
+      setCompanyName(settings.company_name || "");
+      setCompanyDoc(settings.company_cnpj || "");
+      setCompanyAddress(settings.company_address || "");
+      setCompanySite(settings.company_site || "");
+      
+      setNotifNewLead(settings.notif_new_lead ?? true);
+      setNotifDealWon(settings.notif_deal_won ?? true);
+      setNotifFollowup(settings.notif_followup ?? true);
+      setNotifEmail(settings.notif_email ?? false);
+      setNotifWhatsapp(settings.notif_whatsapp ?? true);
+      setNotifSound(settings.notif_sound ?? true);
+      setNotifDesktop(settings.notif_desktop ?? true);
+
+      setAutoAssign(settings.auto_assign ?? true);
+      setAutoFollowup(settings.auto_followup ?? true);
+      setAutoAiLabel(settings.auto_ai_label ?? true);
+      setAutoWelcome(settings.auto_welcome ?? false);
+
+      setDefaultCommission(settings.default_commission?.toString() || "2.5");
+      setCurrency(settings.currency || "BRL");
+      setSalesGoal(settings.monthly_sales_goal?.toString() || "500000");
+      setLeadsGoal(settings.monthly_leads_goal?.toString() || "150");
+      setTaxIncluded(settings.tax_included ?? true);
+    }
+  }, [settings]);
+
   const handleSave = (section: string) => {
-    toast({ title: `${section} salvo com sucesso!` });
+    const dataToUpdate: Partial<AppSettings> = {};
+
+    if (section === "Perfil" || section === "Dados da Loja") {
+      dataToUpdate.profile_name = profileName;
+      dataToUpdate.profile_email = profileEmail;
+      dataToUpdate.profile_phone = profilePhone;
+      dataToUpdate.company_name = companyName;
+      dataToUpdate.company_cnpj = companyDoc;
+      dataToUpdate.company_address = companyAddress;
+      dataToUpdate.company_site = companySite;
+    } else if (section === "Notificações") {
+      dataToUpdate.notif_new_lead = notifNewLead;
+      dataToUpdate.notif_deal_won = notifDealWon;
+      dataToUpdate.notif_followup = notifFollowup;
+      dataToUpdate.notif_email = notifEmail;
+      dataToUpdate.notif_whatsapp = notifWhatsapp;
+      dataToUpdate.notif_sound = notifSound;
+      dataToUpdate.notif_desktop = notifDesktop;
+    } else if (section === "Automações") {
+      dataToUpdate.auto_assign = autoAssign;
+      dataToUpdate.auto_followup = autoFollowup;
+      dataToUpdate.auto_ai_label = autoAiLabel;
+      dataToUpdate.auto_welcome = autoWelcome;
+    } else if (section === "Vendas") {
+      dataToUpdate.default_commission = parseFloat(defaultCommission);
+      dataToUpdate.currency = currency;
+      dataToUpdate.monthly_sales_goal = parseFloat(salesGoal);
+      dataToUpdate.monthly_leads_goal = parseFloat(leadsGoal);
+      dataToUpdate.tax_included = taxIncluded;
+    }
+
+    updateSettings.mutate(dataToUpdate);
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="w-8 h-8 animate-spin text-accent" />
+        <span className="ml-2 text-muted-foreground">Carregando configurações...</span>
+      </div>
+    );
+  }
 
   const cardClass = "glass-card p-6 space-y-5";
   const labelClass = "text-sm font-medium text-foreground";
@@ -59,7 +136,6 @@ const SettingsPage = () => {
           <TabsTrigger value="notifications" className="rounded-full text-xs gap-1.5 data-[state=active]:bg-card data-[state=active]:shadow-sm"><Bell className="w-3.5 h-3.5" />Notificações</TabsTrigger>
           <TabsTrigger value="automations" className="rounded-full text-xs gap-1.5 data-[state=active]:bg-card data-[state=active]:shadow-sm"><Zap className="w-3.5 h-3.5" />Automações</TabsTrigger>
           <TabsTrigger value="sales" className="rounded-full text-xs gap-1.5 data-[state=active]:bg-card data-[state=active]:shadow-sm"><CreditCard className="w-3.5 h-3.5" />Vendas</TabsTrigger>
-          <TabsTrigger value="channels" className="rounded-full text-xs gap-1.5 data-[state=active]:bg-card data-[state=active]:shadow-sm"><MessageSquare className="w-3.5 h-3.5" />Canais</TabsTrigger>
           <TabsTrigger value="security" className="rounded-full text-xs gap-1.5 data-[state=active]:bg-card data-[state=active]:shadow-sm"><Shield className="w-3.5 h-3.5" />Segurança</TabsTrigger>
         </TabsList>
 
@@ -69,7 +145,7 @@ const SettingsPage = () => {
             <div className={cardClass}>
               <div className="flex items-center gap-4 pb-4 border-b border-border">
                 <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-accent to-accent/60 flex items-center justify-center text-xl font-bold text-accent-foreground">
-                  AC
+                  {profileName?.substring(0, 2).toUpperCase() || "AC"}
                 </div>
                 <div>
                   <p className={labelClass}>{profileName}</p>
@@ -102,7 +178,10 @@ const SettingsPage = () => {
                   </Select>
                 </div>
               </div>
-              <Button onClick={() => handleSave("Perfil")} className="rounded-full">Salvar Perfil</Button>
+              <Button onClick={() => handleSave("Perfil")} className="rounded-full" disabled={updateSettings.isPending}>
+                {updateSettings.isPending && <Loader2 className="w-3 h-3 animate-spin mr-2" />}
+                Salvar Perfil
+              </Button>
             </div>
 
             <div className={cardClass}>
@@ -118,14 +197,17 @@ const SettingsPage = () => {
                 </div>
                 <div>
                   <label className={labelClass}>Endereço</label>
-                  <Input defaultValue="Av. Paulista, 1000 - São Paulo, SP" className="mt-1.5" />
+                  <Input value={companyAddress} onChange={e => setCompanyAddress(e.target.value)} className="mt-1.5" />
                 </div>
                 <div>
                   <label className={labelClass}>Site</label>
-                  <Input defaultValue="www.autocrm.com.br" className="mt-1.5" />
+                  <Input value={companySite} onChange={e => setCompanySite(e.target.value)} className="mt-1.5" />
                 </div>
               </div>
-              <Button onClick={() => handleSave("Dados da Loja")} className="rounded-full">Salvar Loja</Button>
+              <Button onClick={() => handleSave("Dados da Loja")} className="rounded-full" disabled={updateSettings.isPending}>
+                {updateSettings.isPending && <Loader2 className="w-3 h-3 animate-spin mr-2" />}
+                Salvar Loja
+              </Button>
             </div>
           </motion.div>
         </TabsContent>
@@ -171,7 +253,10 @@ const SettingsPage = () => {
                   <Switch checked={item.checked} onCheckedChange={item.set} />
                 </div>
               ))}
-              <Button onClick={() => handleSave("Notificações")} className="rounded-full">Salvar Notificações</Button>
+              <Button onClick={() => handleSave("Notificações")} className="rounded-full" disabled={updateSettings.isPending}>
+                {updateSettings.isPending && <Loader2 className="w-3 h-3 animate-spin mr-2" />}
+                Salvar Notificações
+              </Button>
             </div>
           </motion.div>
         </TabsContent>
@@ -194,7 +279,10 @@ const SettingsPage = () => {
                 <Switch checked={item.checked} onCheckedChange={item.set} />
               </div>
             ))}
-            <Button onClick={() => handleSave("Automações")} className="rounded-full">Salvar Automações</Button>
+            <Button onClick={() => handleSave("Automações")} className="rounded-full" disabled={updateSettings.isPending}>
+              {updateSettings.isPending && <Loader2 className="w-3 h-3 animate-spin mr-2" />}
+              Salvar Automações
+            </Button>
           </motion.div>
         </TabsContent>
 
@@ -219,11 +307,11 @@ const SettingsPage = () => {
               </div>
               <div>
                 <label className={labelClass}>Meta mensal de vendas</label>
-                <Input defaultValue="500000" className="mt-1.5" type="number" />
+                <Input value={salesGoal} onChange={e => setSalesGoal(e.target.value)} className="mt-1.5" type="number" />
               </div>
               <div>
                 <label className={labelClass}>Meta de leads/mês</label>
-                <Input defaultValue="150" className="mt-1.5" type="number" />
+                <Input value={leadsGoal} onChange={e => setLeadsGoal(e.target.value)} className="mt-1.5" type="number" />
               </div>
             </div>
             <div className="flex items-center justify-between py-3 border-t border-border mt-2">
@@ -233,37 +321,10 @@ const SettingsPage = () => {
               </div>
               <Switch checked={taxIncluded} onCheckedChange={setTaxIncluded} />
             </div>
-            <Button onClick={() => handleSave("Vendas")} className="rounded-full">Salvar Vendas</Button>
-          </motion.div>
-        </TabsContent>
-
-        {/* CHANNELS */}
-        <TabsContent value="channels">
-          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-            <div className={cardClass}>
-              <h3 className="font-semibold text-foreground flex items-center gap-2"><MessageSquare className="w-4 h-4" /> Integrações de Canais</h3>
-              {[
-                { name: "WhatsApp Business", status: "Conectado", connected: true, desc: "+55 11 99900-0000" },
-                { name: "Instagram Direct", status: "Conectado", connected: true, desc: "@autocrm_veiculos" },
-                { name: "Facebook Messenger", status: "Desconectado", connected: false, desc: "Clique para conectar" },
-                { name: "Email SMTP", status: "Configurado", connected: true, desc: "contato@autocrm.com.br" },
-              ].map((ch, i) => (
-                <div key={i} className="flex items-center justify-between py-3 border-b border-border last:border-0">
-                  <div>
-                    <p className={labelClass}>{ch.name}</p>
-                    <p className={descClass}>{ch.desc}</p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${ch.connected ? "bg-green-500/10 text-green-600" : "bg-secondary text-muted-foreground"}`}>
-                      {ch.status}
-                    </span>
-                    <Button variant="outline" size="sm" className="rounded-full text-xs h-7">
-                      {ch.connected ? "Gerenciar" : "Conectar"}
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <Button onClick={() => handleSave("Vendas")} className="rounded-full" disabled={updateSettings.isPending}>
+              {updateSettings.isPending && <Loader2 className="w-3 h-3 animate-spin mr-2" />}
+              Salvar Vendas
+            </Button>
           </motion.div>
         </TabsContent>
 
