@@ -10,6 +10,8 @@ export interface InboxContact {
   email: string | null;
   source: string | null;
   avatar_url: string | null;
+  notes: string | null;
+  status: string | null;
 }
 
 export interface InboxConversation {
@@ -53,7 +55,7 @@ export function useInbox() {
   const fetchConversations = useCallback(async () => {
     const { data, error } = await supabase
       .from("conversations")
-      .select("*, unread_count, contacts(id, name, phone, whatsapp, email, source, avatar_url)")
+      .select("*, unread_count, contacts(id, name, phone, whatsapp, email, source, avatar_url, notes, status)")
       .order("last_message_at", { ascending: false });
 
     if (error) {
@@ -73,6 +75,8 @@ export function useInbox() {
             email: c.contacts.email,
             source: c.contacts.source,
             avatar_url: c.contacts.avatar_url,
+            notes: c.contacts.notes,
+            status: c.contacts.status,
           }
         : null,
       channel: c.channel,
@@ -145,6 +149,55 @@ export function useInbox() {
     },
     [selectedId, toast]
   );
+
+  const sendMedia = useCallback(
+    async (text: string, media: string, mediaType: string, fileName?: string) => {
+      if (!selectedId || (!text.trim() && !media)) return;
+
+      setSending(true);
+      try {
+        const { data, error } = await supabase.functions.invoke("whatsapp-send", {
+          body: { conversation_id: selectedId, text: text.trim(), media, mediaType, fileName }
+        });
+
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+
+        toast({ title: "Arquivo enviado" });
+      } catch (err: any) {
+        console.error("Error sending media:", err);
+        toast({
+          title: "Erro ao enviar arquivo",
+          description: err.message || "Tente novamente",
+          variant: "destructive",
+        });
+      } finally {
+        setSending(false);
+      }
+    },
+    [selectedId, toast]
+  );
+
+  const updateContact = useCallback(async (contactId: string, updates: Partial<InboxContact>) => {
+    const { error } = await supabase
+      .from("contacts")
+      .update(updates)
+      .eq("id", contactId);
+
+    if (error) {
+      console.error("Error updating contact:", error);
+      toast({ title: "Erro ao atualizar contato", variant: "destructive" });
+      return false;
+    }
+
+    setConversations(prev => prev.map(c => 
+      c.contact?.id === contactId 
+        ? { ...c, contact: { ...c.contact, ...updates } as any } 
+        : c
+    ));
+    toast({ title: "Contato atualizado" });
+    return true;
+  }, [toast]);
 
   const markAsRead = useCallback(async (conversationId: string) => {
     const { error } = await supabase
@@ -226,7 +279,9 @@ export function useInbox() {
     loading,
     sending,
     sendMessage,
+    sendMedia,
     markAsRead,
+    updateContact,
     refresh: fetchConversations,
   };
 }

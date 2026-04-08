@@ -43,10 +43,10 @@ Deno.serve(async (req) => {
       throw new Error("Evolution API environment variables not configured");
     }
 
-    const { conversation_id, text } = await req.json();
+    const { conversation_id, text, media, mediaType, fileName } = await req.json();
 
-    if (!conversation_id || !text) {
-      return new Response(JSON.stringify({ error: "conversation_id and text are required" }), {
+    if (!conversation_id || (!text && !media)) {
+      return new Response(JSON.stringify({ error: "conversation_id and at least text or media are required" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -74,19 +74,30 @@ Deno.serve(async (req) => {
 
     // Send via Evolution API
     const remoteJid = `${phone.replace(/\D/g, "")}@s.whatsapp.net`;
+    const endpoint = media ? "sendMedia" : "sendText";
+    
+    const body: any = {
+      number: remoteJid,
+    };
+
+    if (media) {
+      body.media = media; // Base64
+      body.mediaType = mediaType || "image";
+      body.caption = text || "";
+      if (fileName) body.fileName = fileName;
+    } else {
+      body.text = text;
+    }
 
     const evoResponse = await fetch(
-      `${EVOLUTION_API_URL}/message/sendText/${encodeURIComponent(EVOLUTION_INSTANCE_NAME)}`,
+      `${EVOLUTION_API_URL}/message/${endpoint}/${encodeURIComponent(EVOLUTION_INSTANCE_NAME)}`,
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           apikey: EVOLUTION_API_KEY,
         },
-        body: JSON.stringify({
-          number: remoteJid,
-          text,
-        }),
+        body: JSON.stringify(body),
       }
     );
 
@@ -97,15 +108,13 @@ Deno.serve(async (req) => {
       throw new Error(`Evolution API error [${evoResponse.status}]: ${JSON.stringify(evoData)}`);
     }
 
-    // We deliberately do NOT insert the message into the DB here.
-    // Evolution API will trigger the whatsapp-webhook with fromMe=true upon sending,
-    // which handles the insertion to ensure perfect synchronization across devices.
+    // Update conversation with the message summary
+    const displayMsg = media ? (mediaType === "image" ? "📷 Foto" : "📄 Arquivo") : text;
 
-    // Update conversation
     await serviceSupabase
       .from("conversations")
       .update({
-        last_message: text,
+        last_message: displayMsg,
         last_message_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
