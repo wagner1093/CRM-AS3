@@ -97,9 +97,10 @@ const InboxPage = () => {
   }
 
   return (
-    <div className="flex h-[calc(100vh-theme(spacing.20))] -m-6 lg:-m-8">
-      {/* Conversation list */}
-      <div className="w-[360px] border-r flex flex-col glass-panel">
+    <div className="flex flex-col flex-1 h-[calc(100vh-4rem)] max-w-[1600px] w-full mx-auto p-6 md:p-8">
+      <div className="flex flex-1 w-full bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
+        {/* Conversation list */}
+        <div className="w-[360px] border-r flex flex-col bg-background/50">
         <div className="p-4 border-b space-y-3">
           <h2 className="font-semibold text-lg">Inbox WhatsApp</h2>
           <div className="relative">
@@ -229,7 +230,17 @@ const InboxPage = () => {
                           : "chat-bubble-inbound"
                       }
                     >
-                      <p className="text-sm leading-relaxed">{msg.content}</p>
+                      {msg.media_url && msg.media_type?.startsWith("image/") ? (
+                        <div className="mb-2 rounded-xl overflow-hidden shadow-sm border border-white/10">
+                          <img src={msg.media_url} alt="Mídia Recebida" className="max-w-[240px] max-h-[300px] object-cover" />
+                        </div>
+                      ) : msg.media_url ? (
+                        <div className="mb-2 p-2 rounded-xl bg-black/10 border border-white/10 text-xs flex flex-col gap-1">
+                          🗂️ Arquivo de Mídia Recebido
+                          <a href={msg.media_url} target="_blank" rel="noreferrer" className="underline opacity-80 hover:opacity-100">Ver Mídia</a>
+                        </div>
+                      ) : null}
+                      {msg.content && <p className="text-sm leading-relaxed">{msg.content}</p>}
                       {msg.created_at && (
                         <p
                           className={`text-[10px] mt-1.5 ${
@@ -318,6 +329,7 @@ const InboxPage = () => {
           </div>
         </div>
       )}
+    </div>
     </div>
   );
 };

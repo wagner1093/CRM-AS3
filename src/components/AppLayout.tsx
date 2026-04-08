@@ -4,11 +4,15 @@ import AppHeader from "./AppHeader";
 
 const AppLayout = () => {
   return (
-    <div className="min-h-screen flex bg-background">
+    <div className="min-h-screen bg-background relative selection:bg-primary/10">
       <AppSidebar />
-      <div className="flex-1 flex flex-col min-h-screen min-w-0 overflow-hidden" style={{ marginLeft: "var(--sidebar-width)" }}>
+      <div 
+        className="min-h-screen flex flex-col" 
+        style={{ paddingLeft: "var(--sidebar-width)" }}
+      >
         <AppHeader />
-        <main className="flex-1 overflow-hidden flex flex-col pt-16">
+        {/* O pt-16 (64px) compensa exatamente a altura do Header Fixo. Páginas definem seus próprios paddings internos. */}
+        <main className="flex-1 flex flex-col overflow-y-auto pt-16 overflow-x-hidden">
           <Outlet />
         </main>
       </div>

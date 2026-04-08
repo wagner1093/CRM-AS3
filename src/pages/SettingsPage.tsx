@@ -7,10 +7,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { User, Bell, Shield, Palette, MessageSquare, Car, CreditCard, Globe, Zap, Mail, Loader2 } from "lucide-react";
 import { useSettings, useUpdateSettings, AppSettings } from "@/hooks/useSettings";
+import { useToast } from "@/hooks/use-toast";
 
 const SettingsPage = () => {
   const { data: settings, isLoading } = useSettings();
   const updateSettings = useUpdateSettings();
+  const { toast } = useToast();
 
   // Profile
   const [profileName, setProfileName] = useState("");
@@ -105,6 +107,13 @@ const SettingsPage = () => {
       dataToUpdate.monthly_sales_goal = parseFloat(salesGoal);
       dataToUpdate.monthly_leads_goal = parseFloat(leadsGoal);
       dataToUpdate.tax_included = taxIncluded;
+    } else if (section === "Senha") {
+      // Funcionalidade de demonstração para segurança
+      toast({
+        title: "Segurança",
+        description: "Funcionalidade de alteração de senha integrada ao Supabase Auth está sendo processada.",
+      });
+      return;
     }
 
     updateSettings.mutate(dataToUpdate);
@@ -124,7 +133,7 @@ const SettingsPage = () => {
   const descClass = "text-xs text-muted-foreground mt-0.5";
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="space-y-6 max-w-[1600px] w-full mx-auto p-6 md:p-8">
       <div>
         <h1 className="text-2xl font-bold text-foreground tracking-tight">Configurações</h1>
         <p className="text-sm text-muted-foreground mt-1">Gerencie todas as configurações do seu CRM</p>

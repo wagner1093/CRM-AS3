@@ -556,7 +556,7 @@ const InventoryPage = () => {
   );
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
+    <div className="space-y-6 max-w-[1600px] w-full mx-auto p-6 md:p-8">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground tracking-tight">Estoque</h1>

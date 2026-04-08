@@ -218,7 +218,7 @@ const WaitlistPage = () => {
   // List View
   if (!selectedProfile) {
     return (
-      <div className="p-8 max-w-7xl mx-auto">
+      <div className="space-y-6 max-w-[1600px] w-full mx-auto p-6 md:p-8">
         <div className="page-header flex items-center justify-between">
           <div>
             <h1>Lista Inteligente</h1>
@@ -490,7 +490,7 @@ const WaitlistPage = () => {
   const st = statusConfig[selectedProfile.status];
 
   return (
-    <div className="p-8 max-w-7xl mx-auto">
+    <div className="space-y-6 max-w-[1600px] w-full mx-auto p-6 md:p-8">
       {/* Back */}
       <button onClick={() => setSelectedProfile(null)}
         className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors">

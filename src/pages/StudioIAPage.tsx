@@ -124,7 +124,7 @@ export default function StudioIAPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-[1600px] w-full mx-auto p-6 md:p-8">
       {/* Header */}
       <div className="page-header flex items-center justify-between">
         <div>

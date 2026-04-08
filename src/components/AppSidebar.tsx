@@ -2,6 +2,7 @@ import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { LayoutDashboard, MessageSquare, Kanban, Car, RotateCcw, Users, Repeat, Megaphone, ChevronRight, Sun, Moon, Settings, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
 import { useState } from "react";
+import { useSettings } from "@/hooks/useSettings";
 
 const navItems = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
@@ -20,6 +21,7 @@ const AppSidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [isDark, setIsDark] = useState(false);
+  const { data: settings } = useSettings();
 
   const toggleTheme = () => {
     setIsDark(!isDark);
@@ -34,7 +36,9 @@ const AppSidebar = () => {
           <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center">
             <Car className="w-5 h-5 text-primary-foreground" />
           </div>
-          <span className="font-bold text-lg tracking-tight text-foreground">AutoCRM</span>
+          <span className="font-bold text-lg tracking-tight text-foreground">
+            {settings?.company_name || "AutoCRM"}
+          </span>
         </div>
       </div>
 

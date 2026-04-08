@@ -54,7 +54,25 @@ Deno.serve(async (req) => {
         message.message?.videoMessage?.caption ||
         "";
 
-      if (!messageContent || !remoteJid) {
+      // Evolution API media extraction
+      const isMedia = !!(message.message?.imageMessage || message.message?.videoMessage || message.message?.audioMessage || message.message?.documentMessage);
+      const rawBase64 = message.base64 || data.base64;
+      const mimeType = 
+        message.message?.imageMessage?.mimetype || 
+        message.message?.videoMessage?.mimetype || 
+        message.message?.audioMessage?.mimetype || 
+        message.message?.documentMessage?.mimetype || 
+        "";
+
+      let mediaUrl = null;
+      let mediaType = null;
+
+      if (rawBase64 && isMedia) {
+        mediaUrl = rawBase64.startsWith("data:") ? rawBase64 : `data:${mimeType || "image/jpeg"};base64,${rawBase64}`;
+        mediaType = mimeType || "image/jpeg";
+      }
+
+      if (!messageContent && !mediaUrl && !remoteJid) {
         return new Response(JSON.stringify({ ok: true, skipped: "no content or jid" }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -130,10 +148,12 @@ Deno.serve(async (req) => {
       // Insert message
       const { error: msgErr } = await supabase.from("messages").insert({
         conversation_id: conversation.id,
-        content: messageContent,
+        content: messageContent || (mediaUrl ? "📷 Mídia recebida" : ""),
         direction,
         sender: fromMe ? "agent" : "client",
         phone,
+        media_url: mediaUrl,
+        media_type: mediaType,
       });
 
       if (msgErr) {

@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import SearchModal from "./SearchModal";
 import NotificationsDropdown from "./NotificationsDropdown";
 import UserMenu from "./UserMenu";
+import { useSettings } from "@/hooks/useSettings";
+import NewDealDialog from "./NewDealDialog";
 
 const routeTitles: Record<string, string> = {
   "/": "Dashboard",
@@ -22,7 +24,9 @@ const AppHeader = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchOpen, setSearchOpen] = useState(false);
-  const title = routeTitles[location.pathname] || "AutoCRM";
+  const [newDealOpen, setNewDealOpen] = useState(false);
+  const { data: settings } = useSettings();
+  const title = routeTitles[location.pathname] || settings?.company_name || "AutoCRM";
   const canGoBack = location.pathname !== "/";
 
   return (
@@ -44,7 +48,11 @@ const AppHeader = () => {
         </div>
 
         <div className="flex items-center gap-2">
-          <Button size="sm" className="rounded-full px-4 gap-1.5 bg-accent text-accent-foreground hover:bg-accent/90 font-medium text-xs h-9">
+          <Button 
+            size="sm" 
+            onClick={() => setNewDealOpen(true)}
+            className="rounded-full px-4 gap-1.5 bg-accent text-accent-foreground hover:bg-accent/90 font-medium text-xs h-9"
+          >
             <Plus className="w-3.5 h-3.5" />
             Novo Lead
           </Button>
@@ -62,6 +70,7 @@ const AppHeader = () => {
       </header>
 
       <SearchModal open={searchOpen} onOpenChange={setSearchOpen} />
+      <NewDealDialog open={newDealOpen} onOpenChange={setNewDealOpen} />
     </>
   );
 };

@@ -204,7 +204,7 @@ const RepassePage = () => {
   // Group list view
   if (!selectedGroup) {
     return (
-      <div className="p-8 max-w-7xl mx-auto">
+      <div className="space-y-6 max-w-[1600px] w-full mx-auto p-6 md:p-8">
         <div className="page-header flex items-center justify-between">
           <div>
             <h1>Grupos de Repasse</h1>
@@ -327,7 +327,7 @@ const RepassePage = () => {
 
   // Group detail view
   return (
-    <div className="p-8 max-w-7xl mx-auto">
+    <div className="space-y-6 max-w-[1600px] w-full mx-auto p-6 md:p-8">
       <button onClick={() => setSelectedGroup(null)}
         className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors">
         <ArrowLeft className="w-4 h-4" /> Voltar para grupos

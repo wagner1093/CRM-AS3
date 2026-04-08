@@ -28,6 +28,8 @@ export interface Message {
   conversation_id: string;
   direction: "inbound" | "outbound";
   text: string;
+  media_url?: string | null;
+  media_type?: string | null;
   sent_at: string;
 }
 

@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDeals, useUpdateDealStage, DealWithRelations } from "@/hooks/useDeals";
-import { PIPELINE_STAGES } from "@/data/mockData";
+import { PIPELINE_STAGES } from "@/constants/pipeline";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { motion, AnimatePresence } from "framer-motion";
 import { Phone, Mail, Car, CreditCard, Calendar, Clock, ChevronRight, MessageSquare, MoreHorizontal, Plus, Filter, GripVertical, Pencil } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -26,14 +27,24 @@ const PipelinePage = () => {
   const [dragOverStage, setDragOverStage] = useState<string | null>(null);
   const [newDealOpen, setNewDealOpen] = useState(false);
   const [editDeal, setEditDeal] = useState<DealWithRelations | null>(null);
+  const [search, setSearch] = useState("");
   const navigate = useNavigate();
   const { toast } = useToast();
 
   const { data: deals = [], isLoading, error } = useDeals();
   const updateStage = useUpdateDealStage();
 
+  const filteredDeals = deals.filter(d => {
+    if (!search.trim()) return true;
+    const term = search.toLowerCase();
+    const cName = d.contact?.name?.toLowerCase() || "";
+    const cPhone = d.contact?.whatsapp || d.contact?.phone || "";
+    const vName = d.vehicle ? `${d.vehicle.brand} ${d.vehicle.model}`.toLowerCase() : "";
+    return cName.includes(term) || cPhone.includes(term) || vName.includes(term);
+  });
+
   const stageTotal = (stageKey: string) => {
-    return deals
+    return filteredDeals
       .filter(d => d.stage === stageKey)
       .reduce((sum, d) => sum + (d.vehicle?.price || d.value || 0), 0);
   };
@@ -96,9 +107,9 @@ const PipelinePage = () => {
   }
 
   return (
-    <div className="flex flex-col h-full w-full min-w-0 overflow-hidden">
+    <div className="flex flex-col h-[calc(100vh-4rem)] max-w-[1600px] w-full mx-auto min-w-0 overflow-hidden">
       {/* Fixed Header */}
-      <div className="shrink-0 px-6 lg:px-8 py-6 flex items-start justify-between bg-background/50 backdrop-blur-sm z-10">
+      <div className="shrink-0 px-6 lg:px-8 py-6 flex items-start justify-between bg-background z-10 rounded-t-2xl">
         <div>
           <h1 className="text-2xl font-bold text-foreground tracking-tight">Pipeline</h1>
           <p className="text-sm text-muted-foreground mt-1">
@@ -106,13 +117,15 @@ const PipelinePage = () => {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <button
-            className="filter-pill flex items-center gap-2"
-            onClick={() => toast({ title: "Filtros", description: "Em breve." })}
-          >
-            <Filter className="w-4 h-4" />
-            Filtrar
-          </button>
+          <div className="relative">
+            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+            <Input 
+              placeholder="Buscar por cliente ou veículo..." 
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="pl-8 w-64 rounded-xl h-9 text-xs bg-muted/40 border-border/50"
+            />
+          </div>
           <button
             className="filter-pill active flex items-center gap-2"
             onClick={() => setNewDealOpen(true)}
@@ -127,7 +140,7 @@ const PipelinePage = () => {
       <div className="flex-1 overflow-x-auto overflow-y-hidden">
         <div className="flex gap-4 h-full px-6 lg:px-8 pb-8" style={{ minWidth: "fit-content" }}>
           {PIPELINE_STAGES.map((stage) => {
-            const stageDeals = deals.filter(d => d.stage === stage.key);
+            const stageDeals = filteredDeals.filter(d => d.stage === stage.key);
             const total = stageTotal(stage.key);
             const isDragOver = dragOverStage === stage.key;
 

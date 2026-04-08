@@ -76,7 +76,7 @@ Deno.serve(async (req) => {
     const remoteJid = `${phone.replace(/\D/g, "")}@s.whatsapp.net`;
 
     const evoResponse = await fetch(
-      `${EVOLUTION_API_URL}/message/sendText/${EVOLUTION_INSTANCE_NAME}`,
+      `${EVOLUTION_API_URL}/message/sendText/${encodeURIComponent(EVOLUTION_INSTANCE_NAME)}`,
       {
         method: "POST",
         headers: {

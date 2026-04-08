@@ -33,7 +33,7 @@ const UserMenu = () => {
     { icon: User, label: "Meu Perfil", action: () => goTo("/configuracoes") },
     { icon: Settings, label: "Configurações", action: () => goTo("/configuracoes") },
     { icon: CreditCard, label: "Assinatura", action: () => goTo("/configuracoes") },
-    { icon: HelpCircle, label: "Ajuda & Suporte", action: () => toast({ title: "Central de ajuda em breve!" }) },
+    { icon: HelpCircle, label: "Ajuda & Suporte", action: () => window.open('mailto:suporte@autocrm.com') },
   ];
 
   const userEmail = profile?.email || user?.email || "usuario@autocrm.com";

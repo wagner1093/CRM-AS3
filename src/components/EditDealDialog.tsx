@@ -8,10 +8,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { DealWithRelations, useUpdateDeal, useUpdateContact, useUpdateVehicle, useDeleteDeal, useVehiclesAvailable } from "@/hooks/useDeals";
-import { PIPELINE_STAGES } from "@/data/mockData";
+import { PIPELINE_STAGES } from "@/constants/pipeline";
 import { useToast } from "@/hooks/use-toast";
 import { User, Phone, Mail, Car, CreditCard, AlertTriangle, StickyNote, Trash2, Save, Percent, DollarSign, Palette, Gauge, RotateCcw } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { supabase } from "@/integrations/supabase/client";
 
 interface EditDealDialogProps {
   deal: DealWithRelations | null;
@@ -55,6 +56,29 @@ const EditDealDialog = ({ deal, open, onOpenChange }: EditDealDialogProps) => {
 
   // Follow-up
   const [followupActive, setFollowupActive] = useState(false);
+  const [isSavingFollowup, setIsSavingFollowup] = useState(false);
+
+  useEffect(() => {
+    if (deal?.contact?.id) {
+      supabase
+        .from("conversations")
+        .select("id")
+        .eq("contact_id", deal.contact.id)
+        .maybeSingle()
+        .then(({ data: conv }) => {
+          if (conv) {
+            ((supabase as any)
+              .from("followup_enrollments"))
+              .select("*")
+              .eq("conversation_id", conv.id)
+              .maybeSingle()
+              .then(({ data: enr }: any) => {
+                if (enr && enr.status === "active") setFollowupActive(true);
+              });
+          }
+        });
+    }
+  }, [deal?.contact?.id]);
 
   useEffect(() => {
     if (deal) {
@@ -156,6 +180,50 @@ const EditDealDialog = ({ deal, open, onOpenChange }: EditDealDialogProps) => {
       onOpenChange(false);
     } catch (err: any) {
       toast({ title: "Erro", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleSaveFollowup = async () => {
+    if (!deal.contact?.id) return;
+    setIsSavingFollowup(true);
+    try {
+      // 1. Achar a conversa deste contato
+      let { data: conv } = await supabase
+        .from("conversations")
+        .select("id")
+        .eq("contact_id", deal.contact.id)
+        .maybeSingle();
+
+      if (!conv) {
+        toast({ title: "Sem WhatsApp ativo", description: "O contato não tem uma conversa de WhatsApp iniciada ainda.", variant: "destructive" });
+        setIsSavingFollowup(false);
+        return;
+      }
+
+      const seqId = '11111111-1111-1111-1111-111111111111';
+
+      if (followupActive) {
+        // Ativar
+        const { error } = await (supabase as any).from("followup_enrollments").upsert({
+          conversation_id: conv.id,
+          sequence_id: seqId,
+          status: 'active'
+        }, { onConflict: 'conversation_id' });
+        if (error) throw error;
+      } else {
+        // Pausar
+        const { error } = await (supabase as any).from("followup_enrollments")
+          .update({ status: 'paused' })
+          .eq('conversation_id', conv.id);
+        if (error) throw error;
+      }
+
+      toast({ title: "Follow-up atualizado!" });
+    } catch (err: any) {
+      console.error(err);
+      toast({ title: "Erro", description: err.message, variant: "destructive" });
+    } finally {
+      setIsSavingFollowup(false);
     }
   };
 
@@ -375,8 +443,8 @@ const EditDealDialog = ({ deal, open, onOpenChange }: EditDealDialogProps) => {
           <TabsContent value="followup" className="space-y-4 mt-4">
             <div className="flex items-center justify-between p-4 rounded-xl bg-muted/70">
               <div>
-                <p className="text-sm font-medium">Follow-up automático</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Ativar sequência de mensagens para este contato</p>
+                <p className="text-sm font-medium">Follow-up automático (CRM Brain)</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Ativar disparo programado para vendas</p>
               </div>
               <Switch checked={followupActive} onCheckedChange={setFollowupActive} />
             </div>
@@ -384,25 +452,27 @@ const EditDealDialog = ({ deal, open, onOpenChange }: EditDealDialogProps) => {
               <div className="p-4 rounded-xl border border-accent/20 bg-accent/5 space-y-3">
                 <div className="flex items-center gap-2">
                   <RotateCcw className="w-4 h-4 text-accent" />
-                  <p className="text-sm font-medium">Sequência ativa</p>
+                  <p className="text-sm font-medium">Motor Ativo</p>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  O follow-up será gerenciado pela integração com n8n. Quando ativado, o contato receberá mensagens
-                  automáticas via WhatsApp conforme a sequência configurada.
+                  O sistema gerenciará sozinho os próximos contatos. Nós agendaremos automaticamente:
                 </p>
-                <div className="text-xs text-muted-foreground space-y-1">
-                  <p>📩 Dia 0: Mensagem de boas-vindas</p>
-                  <p>📩 Dia 1: Lembrete do veículo de interesse</p>
-                  <p>📩 Dia 3: Última oportunidade</p>
+                <div className="text-xs text-muted-foreground space-y-1 bg-white/5 p-3 rounded-lg border border-white/5">
+                  <p>📩 Dia 1: "Como foi nossa última conversa?"</p>
+                  <p>📩 Dia 3: "Separei um material do veículo"</p>
+                  <p>📩 Dia 7: "Última tentativa aqui"</p>
                 </div>
               </div>
             )}
             {!followupActive && (
               <div className="text-center py-6 text-sm text-muted-foreground">
                 <RotateCcw className="w-8 h-8 mx-auto mb-3 opacity-40" />
-                <p>Ative o follow-up para enviar mensagens automáticas</p>
+                <p>Ative o follow-up para enviar mensagens progamadas</p>
               </div>
             )}
+            <Button onClick={handleSaveFollowup} disabled={isSavingFollowup} className="w-full gap-2 mt-4 mt-auto">
+              <Save className="w-4 h-4" /> {isSavingFollowup ? "Salvando..." : "Salvar Follow-up"}
+            </Button>
           </TabsContent>
         </Tabs>
 

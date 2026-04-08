@@ -33,6 +33,8 @@ export interface InboxMessage {
   direction: string | null;
   sender: string | null;
   phone: string | null;
+  media_url?: string | null;
+  media_type?: string | null;
   created_at: string | null;
 }
 
@@ -127,29 +129,12 @@ export function useInbox() {
 
       setSending(true);
       try {
-        // Find the conversation to get the phone number
-        const conv = conversations.find((c) => c.id === selectedId);
-        const phone = conv?.contact?.phone || conv?.contact?.whatsapp || conv?.phone || null;
-
-        const { error } = await supabase.from("messages").insert({
-          conversation_id: selectedId,
-          content: text.trim(),
-          direction: "outbound",
-          sender: "agent",
-          phone,
+        const { data, error } = await supabase.functions.invoke("whatsapp-send", {
+          body: { conversation_id: selectedId, text: text.trim() }
         });
 
         if (error) throw error;
-
-        // Update conversation last_message
-        await supabase
-          .from("conversations")
-          .update({
-            last_message: text.trim(),
-            last_message_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", selectedId);
+        if (data?.error) throw new Error(data.error);
 
         toast({ title: "Mensagem enviada" });
       } catch (err: any) {
@@ -163,7 +148,7 @@ export function useInbox() {
         setSending(false);
       }
     },
-    [selectedId, conversations, toast]
+    [selectedId, toast]
   );
 
   // Initial fetch

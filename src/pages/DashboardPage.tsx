@@ -64,7 +64,7 @@ const DashboardPage = () => {
   }
 
   return (
-    <div className="space-y-6 max-w-[1400px]">
+    <div className="space-y-6 max-w-[1600px] w-full mx-auto p-6 md:p-8">
       <div>
         <h1 className="text-2xl font-bold text-foreground tracking-tight">Dashboard</h1>
         <p className="text-sm text-muted-foreground mt-1">Visão geral do seu CRM automotivo</p>
