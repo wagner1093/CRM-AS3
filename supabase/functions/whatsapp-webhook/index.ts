@@ -18,21 +18,11 @@ Deno.serve(async (req) => {
 
     const body = await req.json();
     console.log("Webhook received:", JSON.stringify(body).substring(0, 500));
+    await supabase.from("webhook_logs").insert({ payload: body });
 
-    // Forward to n8n webhook
-    const n8nWebhookUrl = "https://agencia-wg1234-n8n.yj3mui.easypanel.host/webhook/as3motors-whatsapp";
-    try {
-      await fetch(n8nWebhookUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      console.log("Forwarded to n8n");
-    } catch (n8nErr) {
-      console.error("Error forwarding to n8n:", n8nErr);
-    }
 
-    const event = body.event;
+
+    const event = (body.event || "").toLowerCase();
 
     // Handle messages.upsert (incoming messages)
     if (event === "messages.upsert") {
@@ -43,25 +33,25 @@ Deno.serve(async (req) => {
         });
       }
 
-      const message = data.message || data;
-      const key = message.key || {};
+      const msgObj = data.message || {};
+      const key = data.key || {};
       const remoteJid = key.remoteJid || "";
       const fromMe = key.fromMe || false;
       const messageContent =
-        message.message?.conversation ||
-        message.message?.extendedTextMessage?.text ||
-        message.message?.imageMessage?.caption ||
-        message.message?.videoMessage?.caption ||
+        msgObj.conversation ||
+        msgObj.extendedTextMessage?.text ||
+        msgObj.imageMessage?.caption ||
+        msgObj.videoMessage?.caption ||
         "";
 
       // Evolution API media extraction
-      const isMedia = !!(message.message?.imageMessage || message.message?.videoMessage || message.message?.audioMessage || message.message?.documentMessage);
-      const rawBase64 = message.base64 || data.base64;
+      const isMedia = !!(msgObj.imageMessage || msgObj.videoMessage || msgObj.audioMessage || msgObj.documentMessage);
+      const rawBase64 = data.base64;
       const mimeType = 
-        message.message?.imageMessage?.mimetype || 
-        message.message?.videoMessage?.mimetype || 
-        message.message?.audioMessage?.mimetype || 
-        message.message?.documentMessage?.mimetype || 
+        msgObj.imageMessage?.mimetype || 
+        msgObj.videoMessage?.mimetype || 
+        msgObj.audioMessage?.mimetype || 
+        msgObj.documentMessage?.mimetype || 
         "";
 
       let mediaUrl = null;
@@ -78,23 +68,101 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Extract phone number from remoteJid (e.g., "5511999001122@s.whatsapp.net")
+      // Extract phone number and check if it's a group
+      const isGroup = remoteJid.endsWith("@g.us");
       const phone = remoteJid.replace("@s.whatsapp.net", "").replace("@g.us", "");
       const direction = fromMe ? "outbound" : "inbound";
-      const senderName = message.pushName || phone;
+      
+      let senderName = data.pushName || phone;
+      let avatarUrl = null;
+
+      // Logic to find group name and avatar if it's a group
+      if (isGroup) {
+        try {
+          // Check if group metadata is needed
+          let { data: existingGroup } = await supabase
+            .from("contacts")
+            .select("name, avatar_url")
+            .eq("phone", phone)
+            .maybeSingle();
+
+          if (!existingGroup || !existingGroup.avatar_url || existingGroup.name === phone) {
+            const instance = body.instance;
+            const apikey = body.apikey;
+            const serverUrl = body.server_url;
+            
+            if (instance && apikey && serverUrl) {
+              const findGroupUrl = `${serverUrl}/group/findGroupInfos/${instance}?groupJid=${remoteJid}`;
+              const resp = await fetch(findGroupUrl, { headers: { apikey } });
+              
+              if (resp.ok) {
+                const groupInfo = await resp.json();
+                senderName = groupInfo.subject || senderName;
+                avatarUrl = groupInfo.pictureUrl || null;
+                console.log(`Group info found: ${senderName}, avatar: ${!!avatarUrl}`);
+              }
+            }
+          } else {
+            senderName = existingGroup.name;
+            avatarUrl = existingGroup.avatar_url;
+          }
+        } catch (groupErr) {
+          console.error("Error fetching group info:", groupErr);
+        }
+      } else if (!fromMe) {
+        // For individuals, only fetch avatar if missing and only update name if not fromMe
+        try {
+          let { data: existingContact } = await supabase
+            .from("contacts")
+            .select("name, avatar_url")
+            .eq("phone", phone)
+            .maybeSingle();
+
+          if (!existingContact || !existingContact.avatar_url) {
+            const instance = body.instance;
+            const apikey = body.apikey;
+            const serverUrl = body.server_url;
+            
+            if (instance && apikey && serverUrl) {
+              const fetchAvatarUrl = `${serverUrl}/chat/fetchProfilePictureUrl/${instance}`;
+              const resp = await fetch(fetchAvatarUrl, {
+                method: "POST",
+                headers: { "apikey": apikey, "Content-Type": "application/json" },
+                body: JSON.stringify({ number: remoteJid })
+              });
+              
+              if (resp.ok) {
+                const avatarInfo = await resp.json();
+                avatarUrl = avatarInfo.profilePictureUrl || null;
+                console.log(`Avatar found for ${phone}: ${!!avatarUrl}`);
+              }
+            }
+          } else {
+            avatarUrl = existingContact.avatar_url;
+          }
+        } catch (avatarErr) {
+          console.error("Error fetching avatar:", avatarErr);
+        }
+      }
 
       // Find or create contact - search by phone or whatsapp
       let { data: contact } = await supabase
         .from("contacts")
-        .select("id, name")
+        .select("id, name, avatar_url")
         .or(`phone.eq.${phone},whatsapp.eq.${phone}`)
         .maybeSingle();
 
       if (!contact) {
         const { data: newContact, error: contactErr } = await supabase
           .from("contacts")
-          .insert({ name: senderName, phone, whatsapp: phone, source: "whatsapp" })
-          .select("id, name")
+          .insert({ 
+            name: senderName, 
+            phone, 
+            whatsapp: phone, 
+            source: isGroup ? "whatsapp_group" : "whatsapp",
+            avatar_url: avatarUrl
+          })
+          .select("id, name, avatar_url")
           .single();
 
         if (contactErr) {
@@ -102,15 +170,31 @@ Deno.serve(async (req) => {
           throw contactErr;
         }
         contact = newContact;
+      } else {
+        // Update name ONLY if it's a group OR if it's an inbound message and currently has no name
+        const shouldUpdateName = isGroup || (!fromMe && (contact.name === phone || !contact.name));
+        const shouldUpdateAvatar = avatarUrl && contact.avatar_url !== avatarUrl;
+
+        if (shouldUpdateName || shouldUpdateAvatar) {
+          await supabase
+            .from("contacts")
+            .update({ 
+              ...(shouldUpdateName ? { name: senderName } : {}),
+              ...(shouldUpdateAvatar ? { avatar_url: avatarUrl } : {})
+            })
+            .eq("id", contact.id);
+        }
       }
 
-      // Find conversation by contact_id OR by phone
-      let { data: conversation } = await supabase
+      let { data: existingConvs } = await supabase
         .from("conversations")
-        .select("id")
+        .select("id, unread_count")
         .or(`contact_id.eq.${contact.id},phone.eq.${phone}`)
         .eq("channel", "whatsapp")
-        .maybeSingle();
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      let conversation = existingConvs && existingConvs.length > 0 ? existingConvs[0] : null;
 
       if (!conversation) {
         const { data: newConv, error: convErr } = await supabase
@@ -122,8 +206,9 @@ Deno.serve(async (req) => {
             status: "open",
             last_message: messageContent,
             last_message_at: new Date().toISOString(),
+            unread_count: direction === "inbound" ? 1 : 0
           })
-          .select("id")
+          .select("id, unread_count")
           .single();
 
         if (convErr) {
@@ -132,20 +217,26 @@ Deno.serve(async (req) => {
         }
         conversation = newConv;
       } else {
-        // Update conversation with latest message and ensure contact_id/phone are set
+        // Update conversation with latest message and increment unread_count if inbound
+        const updateData: any = {
+          contact_id: contact.id,
+          phone,
+          last_message: messageContent || (mediaUrl ? "📷 Mídia recebida" : ""),
+          last_message_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+
+        if (direction === "inbound") {
+          updateData.unread_count = (conversation.unread_count || 0) + 1;
+        }
+
         await supabase
           .from("conversations")
-          .update({
-            contact_id: contact.id,
-            phone,
-            last_message: messageContent,
-            last_message_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          })
+          .update(updateData)
           .eq("id", conversation.id);
       }
 
-      // Insert message
+      // Insert message with external_id to prevent duplicates
       const { error: msgErr } = await supabase.from("messages").insert({
         conversation_id: conversation.id,
         content: messageContent || (mediaUrl ? "📷 Mídia recebida" : ""),
@@ -154,9 +245,17 @@ Deno.serve(async (req) => {
         phone,
         media_url: mediaUrl,
         media_type: mediaType,
+        external_id: key.id,
       });
 
       if (msgErr) {
+        // If it's a unique constraint violation, we ignore it as it's a duplicate retry
+        if (msgErr.code === "23505") {
+          console.log(`Duplicate message ignored: ${key.id}`);
+          return new Response(JSON.stringify({ ok: true, ignored: "duplicate" }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
         console.error("Error inserting message:", msgErr);
         throw msgErr;
       }

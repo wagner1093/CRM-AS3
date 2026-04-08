@@ -18,6 +18,7 @@ const InboxPage = () => {
     selectedId,
     setSelectedId,
     sendMessage,
+    markAsRead,
     loading,
     sending,
   } = useInbox();
@@ -27,10 +28,20 @@ const InboxPage = () => {
   const [newMessage, setNewMessage] = useState("");
   const chatEndRef = useRef<HTMLDivElement>(null);
 
+  const handleSelectConversation = (id: string) => {
+    setSelectedId(id);
+  };
+
   useEffect(() => {
     const conv = searchParams.get("conv");
     if (conv) setSelectedId(conv);
   }, [searchParams, setSelectedId]);
+
+  useEffect(() => {
+    if (selectedId) {
+      markAsRead(selectedId);
+    }
+  }, [selectedId, markAsRead]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -140,7 +151,7 @@ const InboxPage = () => {
             filtered.map((conv) => (
               <motion.button
                 key={conv.id}
-                onClick={() => setSelectedId(conv.id)}
+                onClick={() => handleSelectConversation(conv.id)}
                 whileTap={{ scale: 0.98 }}
                 className={`w-full text-left p-4 border-b border-border/30 transition-all duration-200 ${
                   selectedId === conv.id
@@ -149,19 +160,35 @@ const InboxPage = () => {
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  <div className="relative w-11 h-11 rounded-full bg-primary/5 border border-border flex items-center justify-center text-sm font-semibold shrink-0">
-                    {getInitials(getContactName(conv))}
-                    {conv.unread_count > 0 && (
-                      <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-accent text-accent-foreground text-[10px] font-bold flex items-center justify-center">
+                  <div className="relative w-11 h-11 rounded-full bg-primary/5 border border-border flex items-center justify-center text-sm font-semibold shrink-0 overflow-hidden">
+                    {conv.contact?.avatar_url ? (
+                      <img 
+                        src={conv.contact.avatar_url} 
+                        alt={getContactName(conv)} 
+                        className="w-full h-full object-cover"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                      />
+                    ) : (
+                      getInitials(getContactName(conv))
+                    )}
+                    {conv.unread_count > 0 && selectedId !== conv.id && (
+                      <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-accent text-accent-foreground text-[10px] font-bold flex items-center justify-center z-10">
                         {conv.unread_count > 99 ? "99+" : conv.unread_count}
                       </span>
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
-                      <span className={`font-medium text-sm ${conv.unread_count > 0 ? "font-semibold" : ""}`}>
-                        {getContactName(conv)}
-                      </span>
+                      <div className="flex flex-col min-w-0">
+                        <span className={`font-medium text-sm truncate ${conv.unread_count > 0 ? "font-semibold" : ""}`}>
+                          {getContactName(conv)}
+                        </span>
+                        {(conv.is_duplicate_name || conv.contact?.source === "whatsapp_group") && (
+                          <span className="text-[10px] text-muted-foreground truncate">
+                            {conv.contact?.source === "whatsapp_group" ? "👥 Grupo" : getContactPhone(conv)}
+                          </span>
+                        )}
+                      </div>
                       {getStatusBadge(conv.status)}
                     </div>
                     <p className={`text-xs truncate mt-1 ${conv.unread_count > 0 ? "text-foreground font-medium" : "text-muted-foreground"}`}>
@@ -193,8 +220,17 @@ const InboxPage = () => {
           <>
             <div className="p-4 border-b glass-panel flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-primary/5 border border-border flex items-center justify-center text-sm font-semibold">
-                  {getInitials(getContactName(selected))}
+                <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 font-medium overflow-hidden">
+                  {selected.contact?.avatar_url ? (
+                    <img 
+                      src={selected.contact.avatar_url} 
+                      alt={getContactName(selected)} 
+                      className="w-full h-full object-cover"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                    />
+                  ) : (
+                    getInitials(getContactName(selected))
+                  )}
                 </div>
                 <div>
                   <p className="font-semibold text-sm">{getContactName(selected)}</p>

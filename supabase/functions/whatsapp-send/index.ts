@@ -35,9 +35,9 @@ Deno.serve(async (req) => {
       });
     }
 
-    const EVOLUTION_API_URL = Deno.env.get("EVOLUTION_API_URL");
-    const EVOLUTION_API_KEY = Deno.env.get("EVOLUTION_API_KEY");
-    const EVOLUTION_INSTANCE_NAME = Deno.env.get("EVOLUTION_INSTANCE_NAME");
+    const EVOLUTION_API_URL = "https://agencia-wg1234-evolution-api.yj3mui.easypanel.host";
+    const EVOLUTION_API_KEY = "14587F3EDC5E-42B5-8D41-E4E6F96FEB8B";
+    const EVOLUTION_INSTANCE_NAME = "Wg 2";
 
     if (!EVOLUTION_API_URL || !EVOLUTION_API_KEY || !EVOLUTION_INSTANCE_NAME) {
       throw new Error("Evolution API environment variables not configured");
@@ -97,18 +97,9 @@ Deno.serve(async (req) => {
       throw new Error(`Evolution API error [${evoResponse.status}]: ${JSON.stringify(evoData)}`);
     }
 
-    // Save outbound message to DB
-    const { error: msgErr } = await serviceSupabase.from("messages").insert({
-      conversation_id,
-      content: text,
-      direction: "outbound",
-      sender: "agent",
-      phone,
-    });
-
-    if (msgErr) {
-      console.error("Error saving message:", msgErr);
-    }
+    // We deliberately do NOT insert the message into the DB here.
+    // Evolution API will trigger the whatsapp-webhook with fromMe=true upon sending,
+    // which handles the insertion to ensure perfect synchronization across devices.
 
     // Update conversation
     await serviceSupabase
