@@ -160,19 +160,21 @@ const InboxPage = () => {
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  <div className="relative w-11 h-11 rounded-full bg-primary/5 border border-border flex items-center justify-center text-sm font-semibold shrink-0 overflow-hidden">
-                    {conv.contact?.avatar_url ? (
-                      <img 
-                        src={conv.contact.avatar_url} 
-                        alt={getContactName(conv)} 
-                        className="w-full h-full object-cover"
-                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                      />
-                    ) : (
-                      getInitials(getContactName(conv))
-                    )}
+                  <div className="relative w-11 h-11 shrink-0">
+                    <div className="w-full h-full rounded-full bg-primary/5 border border-border flex items-center justify-center text-sm font-semibold overflow-hidden">
+                      {conv.contact?.avatar_url ? (
+                        <img 
+                          src={conv.contact.avatar_url} 
+                          alt={getContactName(conv)} 
+                          className="w-full h-full object-cover"
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                        />
+                      ) : (
+                        getInitials(getContactName(conv))
+                      )}
+                    </div>
                     {conv.unread_count > 0 && selectedId !== conv.id && (
-                      <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-accent text-accent-foreground text-[10px] font-bold flex items-center justify-center z-10">
+                      <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-accent text-accent-foreground text-[10px] font-bold flex items-center justify-center shadow-sm z-10">
                         {conv.unread_count > 99 ? "99+" : conv.unread_count}
                       </span>
                     )}
