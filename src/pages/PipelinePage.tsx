@@ -96,9 +96,9 @@ const PipelinePage = () => {
   }
 
   return (
-    <div className="relative flex flex-col min-w-0 overflow-hidden h-[calc(100vh-3rem)] lg:h-[calc(100vh-4rem)]">
-      {/* Header */}
-      <div className="shrink-0 pb-6 flex items-start justify-between">
+    <div className="flex flex-col h-full w-full min-w-0 overflow-hidden">
+      {/* Fixed Header */}
+      <div className="shrink-0 px-6 lg:px-8 py-6 flex items-start justify-between bg-background/50 backdrop-blur-sm z-10">
         <div>
           <h1 className="text-2xl font-bold text-foreground tracking-tight">Pipeline</h1>
           <p className="text-sm text-muted-foreground mt-1">
@@ -123,9 +123,9 @@ const PipelinePage = () => {
         </div>
       </div>
 
-      {/* Kanban */}
-      <div className="flex-1 min-w-0 overflow-x-auto overflow-y-hidden -mx-6 lg:-mx-8 px-6 lg:px-8">
-        <div className="flex gap-4 h-full pb-4" style={{ minWidth: "fit-content" }}>
+      {/* Horizontal Scrollable Pipeline */}
+      <div className="flex-1 overflow-x-auto overflow-y-hidden">
+        <div className="flex gap-4 h-full px-6 lg:px-8 pb-8" style={{ minWidth: "fit-content" }}>
           {PIPELINE_STAGES.map((stage) => {
             const stageDeals = deals.filter(d => d.stage === stage.key);
             const total = stageTotal(stage.key);

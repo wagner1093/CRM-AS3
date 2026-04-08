@@ -14,6 +14,90 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_settings: {
+        Row: {
+          auto_ai_label: boolean | null
+          auto_assign: boolean | null
+          auto_followup: boolean | null
+          auto_welcome: boolean | null
+          company_address: string | null
+          company_cnpj: string | null
+          company_name: string | null
+          company_site: string | null
+          currency: string | null
+          default_commission: number | null
+          id: number
+          monthly_leads_goal: number | null
+          monthly_sales_goal: number | null
+          notif_deal_won: boolean | null
+          notif_desktop: boolean | null
+          notif_email: boolean | null
+          notif_followup: boolean | null
+          notif_new_lead: boolean | null
+          notif_sound: boolean | null
+          notif_whatsapp: boolean | null
+          profile_email: string | null
+          profile_name: string | null
+          profile_phone: string | null
+          tax_included: boolean | null
+          updated_at: string | null
+        }
+        Insert: {
+          auto_ai_label?: boolean | null
+          auto_assign?: boolean | null
+          auto_followup?: boolean | null
+          auto_welcome?: boolean | null
+          company_address?: string | null
+          company_cnpj?: string | null
+          company_name?: string | null
+          company_site?: string | null
+          currency?: string | null
+          default_commission?: number | null
+          id?: number
+          monthly_leads_goal?: number | null
+          monthly_sales_goal?: number | null
+          notif_deal_won?: boolean | null
+          notif_desktop?: boolean | null
+          notif_email?: boolean | null
+          notif_followup?: boolean | null
+          notif_new_lead?: boolean | null
+          notif_sound?: boolean | null
+          notif_whatsapp?: boolean | null
+          profile_email?: string | null
+          profile_name?: string | null
+          profile_phone?: string | null
+          tax_included?: boolean | null
+          updated_at?: string | null
+        }
+        Update: {
+          auto_ai_label?: boolean | null
+          auto_assign?: boolean | null
+          auto_followup?: boolean | null
+          auto_welcome?: boolean | null
+          company_address?: string | null
+          company_cnpj?: string | null
+          company_name?: string | null
+          company_site?: string | null
+          currency?: string | null
+          default_commission?: number | null
+          id?: number
+          monthly_leads_goal?: number | null
+          monthly_sales_goal?: number | null
+          notif_deal_won?: boolean | null
+          notif_desktop?: boolean | null
+          notif_email?: boolean | null
+          notif_followup?: boolean | null
+          notif_new_lead?: boolean | null
+          notif_sound?: boolean | null
+          notif_whatsapp?: boolean | null
+          profile_email?: string | null
+          profile_name?: string | null
+          profile_phone?: string | null
+          tax_included?: boolean | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       contacts: {
         Row: {
           created_at: string | null
@@ -29,7 +113,7 @@ export type Database = {
           status: string | null
           urgency: string | null
           vehicle_interest: string | null
-          whatsapp: string | null
+          whatsapp: string
         }
         Insert: {
           created_at?: string | null
@@ -45,7 +129,7 @@ export type Database = {
           status?: string | null
           urgency?: string | null
           vehicle_interest?: string | null
-          whatsapp?: string | null
+          whatsapp: string
         }
         Update: {
           created_at?: string | null
@@ -61,7 +145,7 @@ export type Database = {
           status?: string | null
           urgency?: string | null
           vehicle_interest?: string | null
-          whatsapp?: string | null
+          whatsapp?: string
         }
         Relationships: []
       }
@@ -261,6 +345,30 @@ export type Database = {
           },
         ]
       }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          email: string | null
+          full_name: string | null
+          id: string
+          updated_at: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          email?: string | null
+          full_name?: string | null
+          id: string
+          updated_at?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       vehicle_images: {
         Row: {
           created_at: string | null
@@ -400,6 +508,106 @@ export type Database = {
           year?: number | null
         }
         Relationships: []
+      }
+      waitlist: {
+        Row: {
+          contact_id: string | null
+          created_at: string | null
+          id: string
+          notes: string | null
+          priority_score: number | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          contact_id?: string | null
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          priority_score?: number | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          contact_id?: string | null
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          priority_score?: number | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "waitlist_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      waitlist_preferences: {
+        Row: {
+          avoid: string[] | null
+          body_type: string | null
+          has_kids: boolean | null
+          id: string
+          max_price: number | null
+          max_year: number | null
+          min_price: number | null
+          min_year: number | null
+          must_have: string[] | null
+          payment_preference: string | null
+          preferred_makes: string[] | null
+          preferred_models: string[] | null
+          trunk_priority: number | null
+          updated_at: string | null
+          waitlist_id: string | null
+        }
+        Insert: {
+          avoid?: string[] | null
+          body_type?: string | null
+          has_kids?: boolean | null
+          id?: string
+          max_price?: number | null
+          max_year?: number | null
+          min_price?: number | null
+          min_year?: number | null
+          must_have?: string[] | null
+          payment_preference?: string | null
+          preferred_makes?: string[] | null
+          preferred_models?: string[] | null
+          trunk_priority?: number | null
+          updated_at?: string | null
+          waitlist_id?: string | null
+        }
+        Update: {
+          avoid?: string[] | null
+          body_type?: string | null
+          has_kids?: boolean | null
+          id?: string
+          max_price?: number | null
+          max_year?: number | null
+          min_price?: number | null
+          min_year?: number | null
+          must_have?: string[] | null
+          payment_preference?: string | null
+          preferred_makes?: string[] | null
+          preferred_models?: string[] | null
+          trunk_priority?: number | null
+          updated_at?: string | null
+          waitlist_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "waitlist_preferences_waitlist_id_fkey"
+            columns: ["waitlist_id"]
+            isOneToOne: false
+            referencedRelation: "waitlist"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

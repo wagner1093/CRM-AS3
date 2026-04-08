@@ -12,8 +12,8 @@ serve(async (req) => {
   try {
     const { imageBase64, backgroundBase64, format, quality } = await req.json();
     
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    const INTERNAL_AI_KEY = Deno.env.get("INTERNAL_AI_KEY");
+    if (!INTERNAL_AI_KEY) throw new Error("INTERNAL_AI_KEY is not configured");
 
     if (!imageBase64) throw new Error("imageBase64 is required");
     if (!backgroundBase64) throw new Error("backgroundBase64 is required");
@@ -52,10 +52,11 @@ IMPORTANT ABOUT FORMAT/CROPPING:
 
 CRITICAL: The car must keep its REAL original appearance. The background must be EXACTLY the one provided in Image 2, not an interpretation or similar scene. Never stretch or deform the background.`;
 
+    // NOTE: This uses a third-party AI gateway. Consider replacing with your own OpenAI/Anthropic/Google key if needed.
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${INTERNAL_AI_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({

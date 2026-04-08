@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { mockWaitlistProfiles, mockWaitlistPreferences, mockWaitlistMatches, mockWaitlistNotifications, defaultMessageTemplate, mockContacts } from "@/data/mockData";
+import { defaultMessageTemplate } from "@/data/mockData";
 import { Contact, WaitlistProfile, WaitlistPreferences, WaitlistMatch } from "@/types/crm";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -10,7 +10,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Search, ArrowLeft, MessageSquare, Eye, X, Send, Clock, Star,
   CheckCircle2, XCircle, Pause, ChevronRight, Car, Phone, Mail,
-  Baby, Briefcase, Sparkles, AlertCircle, Plus, UserPlus, Download, List
+  Baby, Briefcase, Sparkles, AlertCircle, Plus, UserPlus, Download, List, Loader2
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
@@ -18,6 +18,7 @@ import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { useWaitlist, useAddWaitlistEntry, useWaitlistPreferences } from "@/hooks/useWaitlist";
 
 const statusConfig: Record<string, { label: string; icon: React.ElementType; color: string }> = {
   active: { label: "Ativo", icon: CheckCircle2, color: "text-emerald-600 bg-emerald-50" },
@@ -42,15 +43,10 @@ const reasonLabels: Record<string, string> = {
   must_have_hit: "Requisito atendido",
 };
 
-function getProfileSummary(wlId: string) {
-  const prefs = mockWaitlistPreferences[wlId];
-  if (!prefs) return "Sem preferências definidas";
-  const parts: string[] = [];
-  if (prefs.body_type !== "indefinido") parts.push(prefs.body_type.toUpperCase());
-  if (prefs.preferred_models?.length) parts.push(prefs.preferred_models.map(m => m.charAt(0).toUpperCase() + m.slice(1)).join("/"));
-  if (prefs.max_price) parts.push(`até R$ ${(prefs.max_price / 1000).toFixed(0)}k`);
-  if (prefs.must_have?.length) parts.push(prefs.must_have.map(m => m.replace(/_/g, " ")).join(", "));
-  return parts.join(" · ") || "Sem preferências definidas";
+function getProfileSummary(profile: WaitlistProfile) {
+  // Note: This would ideally come from the prefs table join, 
+  // but for now we'll show notes or a generic message if not loaded
+  return profile.notes || "Sem preferências detalhadas";
 }
 
 function ScoreBadge({ score }: { score: number }) {
@@ -86,21 +82,21 @@ const WaitlistPage = () => {
   const [dismissedMatches, setDismissedMatches] = useState<Set<string>>(new Set());
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [form, setForm] = useState({ ...emptyForm });
-  const [profiles, setProfiles] = useState<WaitlistProfile[]>(mockWaitlistProfiles);
+  
+  const { data: profiles = [], isLoading } = useWaitlist();
+  const addEntryMutation = useAddWaitlistEntry();
+  
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
   const navigate = useNavigate();
   const { toast } = useToast();
 
   const exportCSV = () => {
-    const headers = ["Nome", "Telefone", "Email", "Status", "Prioridade", "Carroceria", "Modelos", "Marcas", "Preço Min", "Preço Max", "Ano Min", "Ano Max", "Pagamento", "Requisitos", "Observações"];
+    const headers = ["Nome", "Telefone", "Email", "Status", "Prioridade", "Observações"];
     const rows = profiles.map(p => {
-      const pr = mockWaitlistPreferences[p.id];
       return [
         p.contact.full_name, p.contact.phone_e164, p.contact.email || "",
         p.status, p.priority_score || "",
-        pr?.body_type || "", pr?.preferred_models?.join(";") || "", pr?.preferred_makes?.join(";") || "",
-        pr?.min_price || "", pr?.max_price || "", pr?.min_year || "", pr?.max_year || "",
-        pr?.payment_preference || "", pr?.must_have?.join(";") || "", p.notes || "",
+        p.notes || "",
       ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(",");
     });
     const csv = [headers.join(","), ...rows].join("\n");
@@ -116,52 +112,46 @@ const WaitlistPage = () => {
 
   const updateForm = (field: string, value: string | boolean) => setForm(f => ({ ...f, [field]: value }));
 
-  const handleAddProfile = () => {
+  const handleAddProfile = async () => {
     if (!form.full_name.trim() || !form.phone.trim()) {
       toast({ title: "Preencha nome e telefone", variant: "destructive" });
       return;
     }
-    const id = `wl-${Date.now()}`;
-    const contactId = `c-${Date.now()}`;
-    const newContact: Contact = {
-      id: contactId,
-      full_name: form.full_name.trim(),
-      phone_e164: form.phone.trim(),
-      email: form.email.trim() || null,
-      created_at: new Date().toISOString(),
-    };
-    const newProfile: WaitlistProfile = {
-      id,
-      contact_id: contactId,
-      contact: newContact,
-      status: "active",
-      priority_score: form.priority_score ? parseInt(form.priority_score) : null,
-      notes: form.notes.trim() || null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-    const newPrefs: WaitlistPreferences = {
-      waitlist_id: id,
-      body_type: form.body_type,
-      preferred_makes: form.preferred_makes ? form.preferred_makes.split(",").map(s => s.trim().toLowerCase()).filter(Boolean) : null,
-      preferred_models: form.preferred_models ? form.preferred_models.split(",").map(s => s.trim().toLowerCase()).filter(Boolean) : null,
-      min_year: form.min_year ? parseInt(form.min_year) : null,
-      max_year: form.max_year ? parseInt(form.max_year) : null,
-      min_price: form.min_price ? parseFloat(form.min_price) : null,
-      max_price: form.max_price ? parseFloat(form.max_price) : null,
-      must_have: form.must_have ? form.must_have.split(",").map(s => s.trim().toLowerCase().replace(/\s+/g, "_")).filter(Boolean) : null,
-      avoid: form.avoid ? form.avoid.split(",").map(s => s.trim().toLowerCase().replace(/\s+/g, "_")).filter(Boolean) : null,
-      payment_preference: form.payment_preference,
-      has_kids: form.has_kids,
-      trunk_priority: form.trunk_priority ? parseInt(form.trunk_priority) : null,
-      updated_at: new Date().toISOString(),
-    };
-    // Add to local state
-    setProfiles(prev => [newProfile, ...prev]);
-    mockWaitlistPreferences[id] = newPrefs;
-    setForm({ ...emptyForm });
-    setAddDialogOpen(false);
-    toast({ title: "✅ Contato cadastrado!", description: `${newContact.full_name} adicionado à Lista Inteligente.` });
+
+    try {
+      await addEntryMutation.mutateAsync({
+        contact: {
+          full_name: form.full_name.trim(),
+          phone_e164: form.phone.trim(),
+          email: form.email.trim() || null,
+        },
+        waitlist: {
+          status: "active",
+          priority_score: form.priority_score ? parseInt(form.priority_score) : null,
+          notes: form.notes.trim() || null,
+        },
+        preferences: {
+          body_type: form.body_type,
+          preferred_makes: form.preferred_makes ? form.preferred_makes.split(",").map(s => s.trim().toLowerCase()).filter(Boolean) : null,
+          preferred_models: form.preferred_models ? form.preferred_models.split(",").map(s => s.trim().toLowerCase()).filter(Boolean) : null,
+          min_year: form.min_year ? parseInt(form.min_year) : null,
+          max_year: form.max_year ? parseInt(form.max_year) : null,
+          min_price: form.min_price ? parseFloat(form.min_price) : null,
+          max_price: form.max_price ? parseFloat(form.max_price) : null,
+          must_have: form.must_have ? form.must_have.split(",").map(s => s.trim().toLowerCase().replace(/\s+/g, "_")).filter(Boolean) : null,
+          avoid: form.avoid ? form.avoid.split(",").map(s => s.trim().toLowerCase().replace(/\s+/g, "_")).filter(Boolean) : null,
+          payment_preference: form.payment_preference,
+          has_kids: form.has_kids,
+          trunk_priority: form.trunk_priority ? parseInt(form.trunk_priority) : null,
+        }
+      });
+
+      setForm({ ...emptyForm });
+      setAddDialogOpen(false);
+      toast({ title: "✅ Contato cadastrado!", description: `${form.full_name} adicionado à Lista Inteligente.` });
+    } catch (error: any) {
+      toast({ title: "Erro ao cadastrar", description: error.message, variant: "destructive" });
+    }
   };
 
   const filteredProfiles = useMemo(() => {
@@ -174,15 +164,13 @@ const WaitlistPage = () => {
   }, [search, statusFilter, profiles]);
 
   const profileMatches = useMemo(() => {
-    if (!selectedProfile) return [];
-    return mockWaitlistMatches
-      .filter(m => m.waitlist_id === selectedProfile.id && !dismissedMatches.has(m.id))
-      .sort((a, b) => b.match_score - a.match_score);
+    // Current database doesn't have matches table yet, 
+    // we'll keep this empty for now or implement matching logic later
+    return [];
   }, [selectedProfile, dismissedMatches]);
 
   const profileNotifications = useMemo(() => {
-    if (!selectedProfile) return [];
-    return mockWaitlistNotifications.filter(n => n.waitlist_id === selectedProfile.id);
+    return [];
   }, [selectedProfile]);
 
   const handleSendWhatsApp = (match: WaitlistMatch) => {
@@ -214,12 +202,18 @@ const WaitlistPage = () => {
   };
 
   const matchCountByProfile = useMemo(() => {
-    const counts: Record<string, number> = {};
-    mockWaitlistMatches.filter(m => m.status === "suggested").forEach(m => {
-      counts[m.waitlist_id] = (counts[m.waitlist_id] || 0) + 1;
-    });
-    return counts;
+    // Empty for now until matches are implemented in DB
+    return {};
   }, []);
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+        <Loader2 className="w-10 h-10 animate-spin text-accent" />
+        <p className="text-muted-foreground font-medium">Carregando lista inteligente...</p>
+      </div>
+    );
+  }
 
   // List View
   if (!selectedProfile) {
@@ -292,7 +286,6 @@ const WaitlistPage = () => {
             {filteredProfiles.map((profile, i) => {
               const st = statusConfig[profile.status];
               const matchCount = matchCountByProfile[profile.id] || 0;
-              const lastNotif = mockWaitlistNotifications.filter(n => n.waitlist_id === profile.id).sort((a, b) => b.sent_at.localeCompare(a.sent_at))[0];
               return (
                 <motion.div
                   key={profile.id}
@@ -319,19 +312,13 @@ const WaitlistPage = () => {
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-muted-foreground truncate">{getProfileSummary(profile.id)}</p>
+                    <p className="text-xs text-muted-foreground truncate">{getProfileSummary(profile)}</p>
                   </div>
                   <div className="flex items-center gap-4 text-xs text-muted-foreground shrink-0">
                     {profile.priority_score && (
                       <div className="flex items-center gap-1">
                         <Star className="w-3.5 h-3.5" />
                         <span className="font-medium">{profile.priority_score}</span>
-                      </div>
-                    )}
-                    {lastNotif && (
-                      <div className="flex items-center gap-1">
-                        <Clock className="w-3.5 h-3.5" />
-                        <span>{new Date(lastNotif.sent_at).toLocaleDateString("pt-BR")}</span>
                       </div>
                     )}
                     <ChevronRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -362,7 +349,6 @@ const WaitlistPage = () => {
                 {filteredProfiles.map(profile => {
                   const st = statusConfig[profile.status];
                   const matchCount = matchCountByProfile[profile.id] || 0;
-                  const lastNotif = mockWaitlistNotifications.filter(n => n.waitlist_id === profile.id).sort((a, b) => b.sent_at.localeCompare(a.sent_at))[0];
                   return (
                     <TableRow key={profile.id} className="cursor-pointer hover:bg-muted/50"
                       onClick={() => setSelectedProfile(profile)}>
@@ -375,9 +361,9 @@ const WaitlistPage = () => {
                         </span>
                       </TableCell>
                       <TableCell className="text-center">{profile.priority_score || "—"}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate">{getProfileSummary(profile.id)}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate">{getProfileSummary(profile)}</TableCell>
                       <TableCell className="text-center">{matchCount > 0 ? matchCount : "—"}</TableCell>
-                      <TableCell className="text-xs">{lastNotif ? new Date(lastNotif.sent_at).toLocaleDateString("pt-BR") : "—"}</TableCell>
+                      <TableCell className="text-xs">—</TableCell>
                     </TableRow>
                   );
                 })}
@@ -500,7 +486,7 @@ const WaitlistPage = () => {
   }
 
   // Detail View
-  const prefs = mockWaitlistPreferences[selectedProfile.id];
+  const { data: prefs, isLoading: isLoadingPrefs } = useWaitlistPreferences(selectedProfile?.id);
   const st = statusConfig[selectedProfile.status];
 
   return (

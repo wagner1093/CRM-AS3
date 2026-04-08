@@ -27,7 +27,10 @@ const AppHeader = () => {
 
   return (
     <>
-      <header className="h-16 flex items-center justify-between px-6 border-b border-border bg-card/80 backdrop-blur-xl sticky top-0 z-30">
+      <header 
+        className="h-16 flex items-center justify-between px-6 border-b border-border bg-card/80 backdrop-blur-xl fixed top-0 right-0 z-30 transition-all duration-300" 
+        style={{ left: "var(--sidebar-width, 240px)" }}
+      >
         <div className="flex items-center gap-3">
           {canGoBack && (
             <button
