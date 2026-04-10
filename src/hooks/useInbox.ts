@@ -28,6 +28,7 @@ export interface InboxConversation {
   created_at: string | null;
   phone: string | null;
   unread_count: number;
+  is_typing?: boolean;
   is_duplicate_name?: boolean;
 }
 
@@ -45,6 +46,9 @@ export interface InboxMessage {
   sender_avatar?: string | null;
   created_at: string | null;
   forwarded?: boolean | null;
+  external_id?: string | null;
+  ack?: number | null;
+  is_starred?: boolean | null;
 }
 
 export function useInbox() {
@@ -93,6 +97,7 @@ export function useInbox() {
       created_at: c.created_at,
       phone: c.phone,
       unread_count: c.unread_count || 0,
+      is_typing: c.is_typing || false,
     }));
 
     // Identify duplicate contact names
@@ -127,21 +132,36 @@ export function useInbox() {
 
   // Send a message via edge function
   const sendMessage = useCallback(
-    async (text: string) => {
+    async (text: string, quotedMsgId?: string) => {
       if (!selectedId || !text.trim()) return;
+
+      const currentConv = conversations.find(c => c.id === selectedId);
+      const tempId = "temp-" + Date.now();
+      
+      setMessages(prev => [...prev, {
+        id: tempId,
+        conversation_id: selectedId,
+        content: text.trim(),
+        direction: "outbound",
+        sender: "agent",
+        phone: currentConv?.phone || "Desconhecido",
+        created_at: new Date().toISOString()
+      } as InboxMessage]);
 
       setSending(true);
       try {
         const { data, error } = await supabase.functions.invoke("whatsapp-send", {
-          body: { conversation_id: selectedId, text: text.trim() }
+          body: { conversation_id: selectedId, text: text.trim(), quotedMsgId }
         });
 
         if (error) throw error;
         if (data?.error) throw new Error(data.error);
 
         toast({ title: "Mensagem enviada" });
+        await fetchMessages(selectedId);
       } catch (err: any) {
         console.error("Error sending message:", err);
+        setMessages(prev => prev.filter(m => m.id !== tempId));
         toast({
           title: "Erro ao enviar mensagem",
           description: err.message || "Tente novamente",
@@ -151,25 +171,43 @@ export function useInbox() {
         setSending(false);
       }
     },
-    [selectedId, toast]
+    [selectedId, conversations, toast]
   );
 
   const sendMedia = useCallback(
-    async (text: string, media: string, mediaType: string, fileName?: string) => {
+    async (text: string, media: string, mediaType: string, fileName?: string, quotedMsgId?: string) => {
       if (!selectedId || (!text.trim() && !media)) return;
+
+      const currentConv = conversations.find(c => c.id === selectedId);
+      const tempId = "temp-" + Date.now();
+      
+      setMessages(prev => [...prev, {
+        id: tempId,
+        conversation_id: selectedId,
+        content: text.trim() || "",
+        direction: "outbound",
+        sender: "agent",
+        phone: currentConv?.phone || "Desconhecido",
+        media_url: media,
+        media_type: mediaType,
+        file_name: fileName,
+        created_at: new Date().toISOString()
+      } as InboxMessage]);
 
       setSending(true);
       try {
         const { data, error } = await supabase.functions.invoke("whatsapp-send", {
-          body: { conversation_id: selectedId, text: text.trim(), media, mediaType, fileName }
+          body: { conversation_id: selectedId, text: text.trim(), media, mediaType, fileName, quotedMsgId }
         });
 
         if (error) throw error;
         if (data?.error) throw new Error(data.error);
 
         toast({ title: "Arquivo enviado" });
+        await fetchMessages(selectedId);
       } catch (err: any) {
         console.error("Error sending media:", err);
+        setMessages(prev => prev.filter(m => m.id !== tempId));
         toast({
           title: "Erro ao enviar arquivo",
           description: err.message || "Tente novamente",
@@ -179,7 +217,7 @@ export function useInbox() {
         setSending(false);
       }
     },
-    [selectedId, toast]
+    [selectedId, conversations, toast]
   );
 
   const updateContact = useCallback(async (contactId: string, updates: Partial<InboxContact>) => {
@@ -256,6 +294,18 @@ export function useInbox() {
       )
       .on(
         "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "messages" },
+        (payload) => {
+          const updated = payload.new as InboxMessage;
+          if (updated.conversation_id === selectedId) {
+            setMessages((prev) =>
+              prev.map((m) => m.id === updated.id ? { ...m, ...updated } : m)
+            );
+          }
+        }
+      )
+      .on(
+        "postgres_changes",
         { event: "UPDATE", schema: "public", table: "conversations" },
         (payload) => {
           const updatedConv = payload.new as any;
@@ -275,9 +325,18 @@ export function useInbox() {
     };
   }, [selectedId, fetchConversations, markAsRead]);
 
+  const markConversationUnread = useCallback(async (conversationId: string) => {
+    await supabase
+      .from("conversations")
+      .update({ unread_count: 1 })
+      .eq("id", conversationId);
+    fetchConversations();
+  }, [fetchConversations]);
+
   return {
     conversations,
     messages,
+    setMessages,
     selectedId,
     setSelectedId,
     loading,
@@ -285,6 +344,7 @@ export function useInbox() {
     sendMessage,
     sendMedia,
     markAsRead,
+    markConversationUnread,
     updateContact,
     refresh: fetchConversations,
   };

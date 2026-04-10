@@ -12,6 +12,24 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const webhookToken = Deno.env.get("WEBHOOK_TOKEN");
+    const receivedToken = req.headers.get("x-webhook-token") || new URL(req.url).searchParams.get("token");
+
+    if (webhookToken && receivedToken !== webhookToken) {
+      console.error("Unauthorized webhook attempt");
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Handle GET requests for testing
+    if (req.method === "GET") {
+      return new Response(JSON.stringify({ ok: true, message: "Webhook is running and token is valid!" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
@@ -330,6 +348,66 @@ Deno.serve(async (req) => {
       console.log(`Message saved: ${direction} from ${phone}`);
 
       return new Response(JSON.stringify({ ok: true, conversation_id: conversation.id }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Handle messages.update (ACK / read receipts)
+    if (event === "messages.update") {
+      const updates = Array.isArray(body.data) ? body.data : [body.data];
+      
+      for (const update of updates) {
+        if (!update) continue;
+        
+        const msgId = update.key?.id || update.id;
+        const ackStatus = update.update?.status || update.status;
+        
+        if (msgId && ackStatus !== undefined) {
+          // Map Evolution ACK statuses: 
+          // DELIVERY_ACK (2) = delivered, READ (3) = read, PLAYED (4) = played (voice)
+          const ackValue = typeof ackStatus === "number" ? ackStatus : parseInt(ackStatus);
+          
+          if (!isNaN(ackValue) && ackValue >= 0) {
+            const { error: ackErr } = await supabase
+              .from("messages")
+              .update({ ack: ackValue })
+              .eq("external_id", msgId);
+              
+            if (ackErr) {
+              console.error(`ACK update error for ${msgId}:`, ackErr);
+            } else {
+              console.log(`ACK updated: ${msgId} -> ${ackValue}`);
+            }
+          }
+        }
+      }
+      
+      return new Response(JSON.stringify({ ok: true, event: "messages.update" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Handle presence.update (Typing indicators)
+    if (event === "presence.update") {
+      const data = body.data || {};
+      const remoteJid = data.id || data.remoteJid;
+      const presence = data.presence; // 'composing', 'recording', 'paused', etc.
+      
+      if (remoteJid && presence) {
+        const isTyping = presence === "composing" || presence === "recording";
+        const phone = remoteJid.replace("@s.whatsapp.net", "").replace("@g.us", "");
+        
+        // Find conversation by phone
+        await supabase
+          .from("conversations")
+          .update({ is_typing: isTyping })
+          .eq("phone", phone)
+          .eq("channel", "whatsapp");
+          
+        console.log(`Presence updated for ${phone}: ${presence} (is_typing: ${isTyping})`);
+      }
+      
+      return new Response(JSON.stringify({ ok: true, event: "presence.update" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

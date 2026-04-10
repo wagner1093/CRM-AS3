@@ -43,7 +43,51 @@ Deno.serve(async (req) => {
       throw new Error("Evolution API environment variables not configured");
     }
 
-    const { conversation_id, text, media, mediaType, fileName } = await req.json();
+    const { conversation_id, text, media, mediaType, fileName, quotedMsgId, action, messageId } = await req.json();
+
+    // Handle delete action
+    if (action === "delete" && messageId) {
+      const serviceSupabase = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+
+      const { data: conversation, error: convErr } = await serviceSupabase
+        .from("conversations")
+        .select("id, contact_id, contacts(phone, whatsapp)")
+        .eq("id", conversation_id)
+        .single();
+
+      if (convErr || !conversation) {
+        throw new Error(`Conversation not found: ${convErr?.message}`);
+      }
+
+      const contact = (conversation as any).contacts;
+      const phone = contact?.whatsapp || contact?.phone;
+      let remoteJid = phone.replace(/\D/g, "");
+      if (!remoteJid.includes("@")) {
+        remoteJid = `${remoteJid}@s.whatsapp.net`;
+      }
+
+      const deleteResponse = await fetch(
+        `${EVOLUTION_API_URL}/chat/deleteMessageForEveryone/${encodeURIComponent(EVOLUTION_INSTANCE_NAME)}`,
+        {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: EVOLUTION_API_KEY,
+          },
+          body: JSON.stringify({
+            id: messageId,
+            remoteJid,
+            fromMe: true,
+          }),
+        }
+      );
+
+      const deleteData = await deleteResponse.json();
+      return new Response(
+        JSON.stringify({ ok: true, delete_response: deleteData }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     if (!conversation_id || (!text && !media)) {
       return new Response(JSON.stringify({ error: "conversation_id and at least text or media are required" }), {
@@ -80,29 +124,41 @@ Deno.serve(async (req) => {
       remoteJid = isGroup ? `${remoteJid}@g.us` : `${remoteJid}@s.whatsapp.net`;
     }
 
-    const endpoint = media ? "sendMedia" : "sendText";
+    const endpoint = media ? (mediaType === "audio" ? "sendWhatsAppAudio" : "sendMedia") : "sendText";
     
-    const body: any = {
+    let body: any = {
       number: remoteJid,
     };
 
-    if (media) {
-      body.mediatype = mediaType || "image"; // Using lowercase as per some docs
-      body.caption = text || "";
-      if (fileName) body.fileName = fileName;
+    if (quotedMsgId) {
+      body.options = { 
+        delay: 0,
+        quoted: { messageId: quotedMsgId, key: { id: quotedMsgId } } 
+      };
+    }
 
-      // Extract mimetype from base64 prefix if available and strip prefix
-      if (media.startsWith("data:")) {
-        const parts = media.split(",");
-        if (parts.length > 1) {
-          const mime = parts[0].split(";")[0].split(":")[1];
-          if (mime) body.mimetype = mime;
-          body.media = parts[1]; // Raw base64 without prefix
+    if (media) {
+      const rawMedia = media.startsWith("data:") && media.includes("base64,") ? media.split(",")[1] : media;
+      
+      if (mediaType === "audio") {
+        body.audio = rawMedia;
+      } else {
+        body.mediatype = mediaType || "image";
+        body.caption = text || "";
+        if (fileName) body.fileName = fileName;
+
+        if (media.startsWith("data:")) {
+          const parts = media.split(",");
+          if (parts.length > 1) {
+            const mime = parts[0].split(";")[0].split(":")[1];
+            if (mime) body.mimetype = mime;
+            body.media = rawMedia;
+          } else {
+            body.media = media;
+          }
         } else {
           body.media = media;
         }
-      } else {
-        body.media = media;
       }
     } else {
       body.text = text;
@@ -130,7 +186,16 @@ Deno.serve(async (req) => {
     }
 
     // Update conversation with the message summary
-    const displayMsg = media ? (mediaType === "image" ? "📷 Foto" : "📄 Arquivo") : text;
+    let msgContent = text;
+    if (!msgContent && media) {
+      if (mediaType === "audio") msgContent = "🎤 Áudio";
+      else if (mediaType === "video") msgContent = "🎥 Vídeo";
+      else if (mediaType === "image") msgContent = "📷 Imagem";
+      else if (mediaType?.includes("pdf")) msgContent = "📄 PDF";
+      else msgContent = "📎 Arquivo";
+    }
+
+    const displayMsg = msgContent;
 
     await serviceSupabase
       .from("conversations")
@@ -140,6 +205,30 @@ Deno.serve(async (req) => {
         updated_at: new Date().toISOString(),
       })
       .eq("id", conversation_id);
+
+    // Insert Outbound message instantly so we don't depend on the webhook 
+    // (especially because webhooks drop base64 for outbound media)
+    const messageId = evoData?.key?.id || evoData?.message?.key?.id || null;
+    
+    if (messageId) {
+      const { error: msgErr } = await serviceSupabase
+        .from("messages")
+        .insert({
+          conversation_id,
+          content: text || "",  // If no text, we can leave it blank (or put msgContent)
+          direction: "outbound",
+          sender: "agent",
+          phone,
+          media_url: media ? media : null,
+          media_type: media ? mediaType : null,
+          file_name: fileName || null,
+          external_id: messageId
+        });
+
+      if (msgErr && msgErr.code !== "23505") {
+        console.error("Local message insert error:", msgErr);
+      }
+    }
 
     return new Response(
       JSON.stringify({ ok: true, evolution_response: evoData }),
