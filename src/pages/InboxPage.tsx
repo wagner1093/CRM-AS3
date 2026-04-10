@@ -330,10 +330,26 @@ const InboxPage = () => {
           <div className="whatsapp-sender-name">{msg.sender_name}</div>
         )}
 
-        {/* Image */}
+        {/* Image with WhatsApp-style tight padding and overlay timestamp */}
         {isImage && msg.media_url && (
-          <div className="mb-2 rounded-2xl overflow-hidden shadow-md border border-white/10 cursor-pointer group relative">
-            <img src={msg.media_url} alt="Mídia" className="max-w-full h-auto object-cover transition-transform group-hover:scale-105" />
+          <div className="relative rounded-[8px] overflow-hidden cursor-pointer group">
+            <img 
+              src={msg.media_url} 
+              alt="Mídia" 
+              className="w-full max-w-[340px] h-auto object-cover transition-transform group-hover:scale-105" 
+            />
+            {/* Subtle interactive overlay */}
+            <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity z-10" />
+            
+            {/* Bottom Gradient for Timestamp visibility */}
+            <div className="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-black/60 to-transparent pointer-events-none z-10" />
+            
+            {/* Inner Timestamp */}
+            {msg.created_at && (
+              <div className="absolute bottom-1 right-2 text-[10px] text-white/90 drop-shadow-md z-20 font-medium">
+                {format(new Date(msg.created_at), "HH:mm")}
+              </div>
+            )}
           </div>
         )}
 
@@ -342,26 +358,32 @@ const InboxPage = () => {
           <VoiceMessage msg={msg} direction={msg.direction || "inbound"} />
         )}
 
-        {/* PDF / Document card (Integrated look) */}
+        {/* PDF / Document card (WhatsApp Native) */}
         {(isPdf || isDoc) && msg.media_url && (
-          <div className="media-card-premium mb-2">
-            <div className="media-card-header">
-              <img src="/placeholder-doc-header.png" alt="" />
-              <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                 <FileText className="w-10 h-10 text-white/50" />
-              </div>
+          <div 
+            className="flex items-center gap-3 bg-black/10 hover:bg-black/20 transition-colors cursor-pointer -mx-[12px] -mt-[8px] px-3 py-3 rounded-t-[10px] group"
+            onClick={() => window.open(msg.media_url, "_blank")}
+            title="Clique para baixar ou visualizar"
+          >
+            {/* Native Red Badge */}
+            <div className="relative w-[34px] h-[40px] rounded-sm bg-[#e53935] flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
+              <div className="absolute top-0 right-0 w-3 h-3 bg-white/20" style={{ clipPath: 'polygon(100% 0, 0 0, 100% 100%)' }} />
+              <span className="text-[9px] font-bold text-white uppercase">{msg.media_type?.split("/")[1]?.slice(0, 3) || "DOC"}</span>
             </div>
-            <div className="flex items-center gap-3 p-3">
-              <div className="w-10 h-10 rounded-lg bg-red-500/20 flex items-center justify-center shrink-0">
-                <div className="w-6 h-6 bg-red-600 rounded flex items-center justify-center text-[8px] font-bold text-white">PDF</div>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-[12px] font-bold truncate leading-tight">{getFileName()}</p>
-                <p className="text-[10px] opacity-40 uppercase font-medium">PDF • {(Math.random() * 5 + 1).toFixed(1)} MB</p>
-              </div>
+            
+            <div className="flex-1 min-w-0 pr-1">
+              <p className="text-[14px] font-medium truncate leading-tight text-white/95">{getFileName()}</p>
+              <p className="text-[12px] text-white/60 font-normal mt-0.5">
+                {msg.media_type?.split("/")[1]?.toUpperCase().slice(0, 4) || "PDF"} • {(Math.random() * 5 + 1).toFixed(1)} MB
+              </p>
+            </div>
+            
+            <div className="w-8 h-8 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/10 shrink-0">
+              <Download className="w-4 h-4 text-white/80" />
             </div>
           </div>
         )}
+
 
         {/* Text content with linkified URLs */}
         {msg.content && !["🎤 Áudio","🎥 Vídeo","📷 Imagem","📄 PDF","📎 Arquivo"].includes(msg.content) && (
@@ -370,8 +392,8 @@ const InboxPage = () => {
           </p>
         )}
 
-        {/* Integrated Timestamp */}
-        {msg.created_at && (
+        {/* Integrated Timestamp (Hidden for Images as they have their own inner timestamp) */}
+        {msg.created_at && !isImage && (
           <div className="message-timestamp-inside">
             {format(new Date(msg.created_at), "HH:mm")}
           </div>
@@ -379,6 +401,7 @@ const InboxPage = () => {
       </div>
     );
   };
+
 
 
   if (loading) {
@@ -523,7 +546,7 @@ const InboxPage = () => {
                         key={msg.id}
                         initial={{ opacity: 0, y: 8 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className={`flex ${isOutbound ? "justify-end" : "justify-start"} ${isSequential ? "mt-[-8px]" : "mt-2"}`}
+                        className={`flex w-full ${isOutbound ? "justify-end" : "justify-start"} ${isSequential ? "mt-[2px]" : "mt-3"}`}
                       >
                         <div className="flex items-end gap-2 max-w-[85%]">
                           {/* Group Chat Avatar (Only show for first sequential inbound msg) */}
@@ -543,7 +566,11 @@ const InboxPage = () => {
                             </div>
                           )}
 
-                          <div className={`whatsapp-bubble-dark ${isOutbound ? "whatsapp-outbound" : "whatsapp-inbound"}`}>
+                          <div className={
+                            `whatsapp-bubble-dark ${isOutbound ? "whatsapp-outbound" : "whatsapp-inbound"} ` +
+                            `${msg.media_type?.startsWith("image") ? "p-[3px] sm:p-[3px]" : ""} ` +
+                            `${isSequential ? (isOutbound ? "rounded-tr-md" : "rounded-tl-md") : ""}`
+                          }>
                             {/* Hide sender name if sequential */}
                             {renderMessageContent({
                               ...msg,

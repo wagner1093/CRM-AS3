@@ -272,7 +272,6 @@
   /* WhatsApp Premium Theme */
   .whatsapp-bubble-dark {
     position: relative;
-    max-width: 85%;
     border-radius: 12px;
     padding: 8px 12px;
     box-shadow: 0 1px 0.5px rgba(0,0,0,0.13);

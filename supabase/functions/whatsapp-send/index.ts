@@ -87,16 +87,22 @@ Deno.serve(async (req) => {
     };
 
     if (media) {
-      // Media should be the full base64 with prefix (data:...;base64,...)
-      body.media = media;
       body.mediatype = mediaType || "image"; // Using lowercase as per some docs
       body.caption = text || "";
       if (fileName) body.fileName = fileName;
 
-      // Extract mimetype from base64 prefix if available
+      // Extract mimetype from base64 prefix if available and strip prefix
       if (media.startsWith("data:")) {
-        const mime = media.split(";")[0].split(":")[1];
-        if (mime) body.mimetype = mime;
+        const parts = media.split(",");
+        if (parts.length > 1) {
+          const mime = parts[0].split(";")[0].split(":")[1];
+          if (mime) body.mimetype = mime;
+          body.media = parts[1]; // Raw base64 without prefix
+        } else {
+          body.media = media;
+        }
+      } else {
+        body.media = media;
       }
     } else {
       body.text = text;
