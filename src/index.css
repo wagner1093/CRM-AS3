@@ -262,4 +262,102 @@
   .glass-table-row:hover {
     background: hsl(var(--glass));
   }
+
+  /* Rich Media Elements */
+  .whatsapp-link {
+    @apply text-accent hover:underline cursor-pointer transition-all;
+    font-weight: 500;
+  }
+  
+  /* WhatsApp Premium Theme */
+  .whatsapp-bubble-dark {
+    position: relative;
+    max-width: 85%;
+    border-radius: 12px;
+    padding: 8px 12px;
+    box-shadow: 0 1px 0.5px rgba(0,0,0,0.13);
+  }
+
+  .whatsapp-inbound {
+    background: #202c33 !important;
+    color: #e9edef !important;
+    border-top-left-radius: 4px !important;
+  }
+
+  .whatsapp-outbound {
+    background: #005c4b !important;
+    color: #e9edef !important;
+    border-top-right-radius: 4px !important;
+  }
+
+  .whatsapp-sender-name {
+    font-size: 11px;
+    font-weight: 600;
+    margin-bottom: 2px;
+    color: #06cf9c;
+  }
+
+  .avatar-group-container {
+    @apply flex items-end gap-2 mb-1;
+  }
+
+  .avatar-mini {
+    @apply w-8 h-8 rounded-full border border-white/5 shadow-sm shrink-0 mb-1;
+  }
+
+  .mic-badge {
+    @apply absolute bottom-0 right-[-2px] w-4 h-4 bg-[#00a884] rounded-full flex items-center justify-center border-2 border-[#202c33] text-white;
+  }
+
+  .audio-player-premium {
+    @apply flex items-center gap-2 py-1 w-full min-w-[240px];
+  }
+
+  .audio-waveform-dot {
+    @apply absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 bg-[#00a884] rounded-full;
+    box-shadow: 0 0 0 3px rgba(0, 168, 132, 0.2);
+  }
+
+  .waveform-dots-container {
+    @apply flex-1 h-8 flex items-center gap-[3px] px-1 relative;
+  }
+
+  .waveform-dot-static {
+    @apply w-[3px] h-[3px] bg-white/20 rounded-full;
+  }
+
+  .waveform-dot-active {
+    @apply bg-[#00a884];
+  }
+
+  .message-timestamp-inside {
+    @apply text-[9px] opacity-40 font-mono ml-auto mt-0.5 text-right;
+    min-width: 35px;
+  }
+
+  .media-card-premium {
+    @apply rounded-xl border border-white/10 overflow-hidden bg-black/20 transition-all duration-300 w-full;
+  }
+
+  .media-card-header {
+    @apply w-full h-24 bg-gradient-to-br from-[#2c3e50] to-[#000000] flex items-center justify-center relative overflow-hidden;
+  }
+
+  .media-card-header img {
+    @apply w-full h-full object-cover opacity-80;
+  }
+
+  .mention-link {
+    color: #25d366;
+    font-weight: 600;
+  }
+
+  .whatsapp-link {
+    color: #53bdeb;
+    text-decoration: none;
+  }
+
+  .whatsapp-link:hover {
+    text-decoration: underline;
+  }
 }

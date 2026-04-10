@@ -44,15 +44,26 @@ Deno.serve(async (req) => {
         msgObj.videoMessage?.caption ||
         "";
 
+      // Detect forwarded messages (Evolution API sets contextInfo.isForwarded)
+      const contextInfo = 
+        msgObj.extendedTextMessage?.contextInfo ||
+        msgObj.imageMessage?.contextInfo ||
+        msgObj.videoMessage?.contextInfo ||
+        msgObj.audioMessage?.contextInfo ||
+        msgObj.documentMessage?.contextInfo ||
+        {};
+      const isForwarded = contextInfo.isForwarded === true || (contextInfo.forwardingScore || 0) > 0;
+
       // Evolution API media extraction
       const isMedia = !!(msgObj.imageMessage || msgObj.videoMessage || msgObj.audioMessage || msgObj.documentMessage);
-      const rawBase64 = data.base64;
+      const rawBase64 = msgObj.base64 || data.base64;
       const mimeType = 
         msgObj.imageMessage?.mimetype || 
         msgObj.videoMessage?.mimetype || 
         msgObj.audioMessage?.mimetype || 
         msgObj.documentMessage?.mimetype || 
         "";
+      const fileName = msgObj.documentMessage?.fileName || msgObj.audioMessage?.fileName || null;
 
       let mediaUrl = null;
       let mediaType = null;
@@ -145,6 +156,40 @@ Deno.serve(async (req) => {
         }
       }
 
+      // For groups, identify the actual sender (participant)
+      let msgSenderName = senderName;
+      let msgSenderAvatar = null;
+
+      if (isGroup && !fromMe) {
+        msgSenderName = data.pushName || phone;
+        const participantJid = key.participant || key.participantAlt || remoteJid;
+        
+        // Try to fetch participant avatar if it's a group
+        try {
+          const instance = body.instance;
+          const apikey = body.apikey;
+          const serverUrl = body.server_url;
+          
+          if (instance && apikey && serverUrl) {
+            const fetchAvatarUrl = `${serverUrl}/chat/fetchProfilePictureUrl/${instance}`;
+            const resp = await fetch(fetchAvatarUrl, {
+              method: "POST",
+              headers: { "apikey": apikey, "Content-Type": "application/json" },
+              body: JSON.stringify({ number: participantJid })
+            });
+            
+            if (resp.ok) {
+              const avatarInfo = await resp.json();
+              msgSenderAvatar = avatarInfo.profilePictureUrl || null;
+            }
+          }
+        } catch (err) {
+          console.error("Error fetching participant avatar:", err);
+        }
+      } else if (!isGroup && !fromMe) {
+        msgSenderAvatar = avatarUrl;
+      }
+
       // Find or create contact - search by phone or whatsapp
       let { data: contact } = await supabase
         .from("contacts")
@@ -156,11 +201,11 @@ Deno.serve(async (req) => {
         const { data: newContact, error: contactErr } = await supabase
           .from("contacts")
           .insert({ 
-            name: senderName, 
+            name: isGroup ? senderName : msgSenderName, 
             phone, 
             whatsapp: phone, 
             source: isGroup ? "whatsapp_group" : "whatsapp",
-            avatar_url: avatarUrl
+            avatar_url: isGroup ? (avatarUrl || msgSenderAvatar) : avatarUrl
           })
           .select("id, name, avatar_url")
           .single();
@@ -171,16 +216,17 @@ Deno.serve(async (req) => {
         }
         contact = newContact;
       } else {
-        // Update name ONLY if it's a group OR if it's an inbound message and currently has no name
+        // Update contact info if it's a direct message or if the group name changed
         const shouldUpdateName = isGroup || (!fromMe && (contact.name === phone || !contact.name));
-        const shouldUpdateAvatar = avatarUrl && contact.avatar_url !== avatarUrl;
+        const currentAvatar = isGroup ? avatarUrl : msgSenderAvatar;
+        const shouldUpdateAvatar = currentAvatar && contact.avatar_url !== currentAvatar;
 
         if (shouldUpdateName || shouldUpdateAvatar) {
           await supabase
             .from("contacts")
             .update({ 
-              ...(shouldUpdateName ? { name: senderName } : {}),
-              ...(shouldUpdateAvatar ? { avatar_url: avatarUrl } : {})
+              ...(shouldUpdateName ? { name: isGroup ? senderName : msgSenderName } : {}),
+              ...(shouldUpdateAvatar ? { avatar_url: currentAvatar } : {})
             })
             .eq("id", contact.id);
         }
@@ -218,10 +264,19 @@ Deno.serve(async (req) => {
         conversation = newConv;
       } else {
         // Update conversation with latest message and increment unread_count if inbound
+        // Build a human-readable last_message preview
+        let lastMsgPreview = messageContent;
+        if (!lastMsgPreview && mediaUrl) {
+          if (mediaType?.startsWith("audio")) lastMsgPreview = "🎤 Áudio";
+          else if (mediaType?.startsWith("video")) lastMsgPreview = "🎥 Vídeo";
+          else if (mediaType?.startsWith("image")) lastMsgPreview = "📷 Imagem";
+          else if (mediaType?.includes("pdf")) lastMsgPreview = "📄 PDF";
+          else lastMsgPreview = "📎 Arquivo";
+        }
         const updateData: any = {
           contact_id: contact.id,
           phone,
-          last_message: messageContent || (mediaUrl ? "📷 Mídia recebida" : ""),
+          last_message: lastMsgPreview || "",
           last_message_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         };
@@ -237,15 +292,27 @@ Deno.serve(async (req) => {
       }
 
       // Insert message with external_id to prevent duplicates
+      let msgContent = messageContent;
+      if (!msgContent && mediaUrl) {
+        if (mediaType?.startsWith("audio")) msgContent = "🎤 Áudio";
+        else if (mediaType?.startsWith("video")) msgContent = "🎥 Vídeo";
+        else if (mediaType?.startsWith("image")) msgContent = "📷 Imagem";
+        else if (mediaType?.includes("pdf")) msgContent = "📄 PDF";
+        else msgContent = "📎 Arquivo";
+      }
       const { error: msgErr } = await supabase.from("messages").insert({
         conversation_id: conversation.id,
-        content: messageContent || (mediaUrl ? "📷 Mídia recebida" : ""),
+        content: msgContent || "",
         direction,
         sender: fromMe ? "agent" : "client",
         phone,
         media_url: mediaUrl,
         media_type: mediaType,
+        file_name: fileName,
+        sender_name: fromMe ? null : msgSenderName,
+        sender_avatar: fromMe ? null : msgSenderAvatar,
         external_id: key.id,
+        forwarded: isForwarded,
       });
 
       if (msgErr) {

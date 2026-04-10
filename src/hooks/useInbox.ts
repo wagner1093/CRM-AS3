@@ -40,7 +40,11 @@ export interface InboxMessage {
   phone: string | null;
   media_url?: string | null;
   media_type?: string | null;
+  file_name?: string | null;
+  sender_name?: string | null;
+  sender_avatar?: string | null;
   created_at: string | null;
+  forwarded?: boolean | null;
 }
 
 export function useInbox() {

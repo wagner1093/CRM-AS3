@@ -67,13 +67,19 @@ Deno.serve(async (req) => {
 
     const contact = (conversation as any).contacts;
     const phone = contact?.whatsapp || contact?.phone;
+    const isGroup = contact?.source === "whatsapp_group";
 
     if (!phone) {
       throw new Error("Contact has no phone number");
     }
 
     // Send via Evolution API
-    const remoteJid = `${phone.replace(/\D/g, "")}@s.whatsapp.net`;
+    // Correct JID formatting: @g.us for groups, @s.whatsapp.net for personal
+    let remoteJid = isGroup ? phone : phone.replace(/\D/g, "");
+    if (!remoteJid.includes("@")) {
+      remoteJid = isGroup ? `${remoteJid}@g.us` : `${remoteJid}@s.whatsapp.net`;
+    }
+
     const endpoint = media ? "sendMedia" : "sendText";
     
     const body: any = {
@@ -81,13 +87,22 @@ Deno.serve(async (req) => {
     };
 
     if (media) {
-      body.media = media; // Base64
-      body.mediaType = mediaType || "image";
+      // Media should be the full base64 with prefix (data:...;base64,...)
+      body.media = media;
+      body.mediatype = mediaType || "image"; // Using lowercase as per some docs
       body.caption = text || "";
       if (fileName) body.fileName = fileName;
+
+      // Extract mimetype from base64 prefix if available
+      if (media.startsWith("data:")) {
+        const mime = media.split(";")[0].split(":")[1];
+        if (mime) body.mimetype = mime;
+      }
     } else {
       body.text = text;
     }
+
+    console.log(`Sending ${endpoint} to ${remoteJid}...`);
 
     const evoResponse = await fetch(
       `${EVOLUTION_API_URL}/message/${endpoint}/${encodeURIComponent(EVOLUTION_INSTANCE_NAME)}`,

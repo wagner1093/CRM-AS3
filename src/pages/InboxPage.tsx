@@ -15,7 +15,16 @@ import {
   Plus,
   Pencil,
   Check,
-  ChevronRight
+  ChevronRight,
+  Forward,
+  Download,
+  ExternalLink,
+  FileText,
+  Mic,
+  Play,
+  Pause,
+  Headphones,
+  Paperclip
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -24,6 +33,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { motion, AnimatePresence } from "framer-motion";
 import { useInbox } from "@/hooks/useInbox";
+import type { InboxMessage } from "@/hooks/useInbox";
 import { 
   DropdownMenu,
   DropdownMenuContent,
@@ -31,6 +41,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Textarea } from "@/components/ui/textarea";
+import { useProfile } from "@/hooks/useProfile";
 
 const InboxPage = () => {
   const [searchParams] = useSearchParams();
@@ -47,6 +58,8 @@ const InboxPage = () => {
     loading,
     sending,
   } = useInbox();
+
+  const { data: profile } = useProfile();
 
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
@@ -95,9 +108,8 @@ const InboxPage = () => {
     const reader = new FileReader();
     reader.onload = async (e) => {
       const fullBase64 = e.target?.result as string;
-      const base64 = fullBase64.split(",")[1]; // Remove prefix 'data:...;base64,'
       const mediaType = file.type.startsWith("image/") ? "image" : "document";
-      await sendMedia("", base64, mediaType, file.name);
+      await sendMedia("", fullBase64, mediaType, file.name);
     };
     reader.readAsDataURL(file);
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -157,6 +169,218 @@ const InboxPage = () => {
     return <span className={`text-[11px] px-2 py-0.5 rounded-full border ${s.className}`}>{s.label}</span>;
   };
 
+  // Helper to make URLs clickable in messages
+  const linkifyText = (text: string) => {
+    if (!text) return text;
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const parts = text.split(urlRegex);
+    
+    return parts.map((part, i) => {
+      if (part.match(urlRegex)) {
+        return (
+          <a
+            key={i}
+            href={part}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="whatsapp-link"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {part}
+          </a>
+        );
+      }
+      return part;
+    });
+  };
+
+  // Internal Audio Component for a premium feel
+  const VoiceMessage = ({ msg, direction }: { msg: InboxMessage, direction: string }) => {
+    const [isPlaying, setIsPlaying] = useState(false);
+    const [duration, setDuration] = useState<number | null>(null);
+    const [currentTime, setCurrentTime] = useState(0);
+    const audioRef = useRef<HTMLAudioElement>(null);
+
+    const togglePlay = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (audioRef.current) {
+        if (isPlaying) {
+          audioRef.current.pause();
+        } else {
+          audioRef.current.play();
+        }
+        setIsPlaying(!isPlaying);
+      }
+    };
+
+    const formatTime = (time: number) => {
+      const minutes = Math.floor(time / 60);
+      const seconds = Math.floor(time % 60);
+      return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    };
+
+    const onTimeUpdate = () => {
+      if (audioRef.current) {
+        setCurrentTime(audioRef.current.currentTime);
+      }
+    };
+
+    const onLoadedMetadata = () => {
+      if (audioRef.current) {
+        setDuration(audioRef.current.duration);
+      }
+    };
+
+    // Calculate progress as percentage for the green dot
+    const progress = (currentTime / (duration || 1)) * 100;
+
+    const messageAvatar = direction === "outbound" 
+      ? profile?.avatar_url 
+      : (msg.sender_avatar || selected?.contact?.avatar_url);
+
+    return (
+      <div className="audio-player-premium">
+        <audio 
+          ref={audioRef} 
+          src={msg.media_url!} 
+          onEnded={() => setIsPlaying(false)}
+          onPause={() => setIsPlaying(false)}
+          onPlay={() => setIsPlaying(true)}
+          onTimeUpdate={onTimeUpdate}
+          onLoadedMetadata={onLoadedMetadata}
+        />
+        
+        <button 
+          onClick={togglePlay}
+          className="text-white opacity-80 hover:opacity-100 transition-opacity"
+        >
+          {isPlaying ? <Pause className="w-5 h-5 fill-current" /> : <Play className="w-5 h-5 fill-current" />}
+        </button>
+
+        <div className="waveform-dots-container">
+          <div className="flex-1 flex gap-[3px]">
+            {[...Array(30)].map((_, i) => (
+              <div 
+                key={i} 
+                className={`w-[2px] h-3 rounded-full transition-all ${progress > (i / 30) * 100 ? "bg-[#00a884]" : "bg-white/20"}`}
+                style={{ height: `${Math.random() * 8 + 4}px` }}
+              />
+            ))}
+          </div>
+          {/* Progress Dot */}
+          <div 
+            className="audio-waveform-dot"
+            style={{ left: `${Math.max(0, Math.min(progress, 98))}%` }}
+          />
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-[9px] opacity-60 font-mono">
+            {formatTime(currentTime || duration || 0)}
+          </span>
+          <div className="relative">
+            <div className="w-10 h-10 rounded-full overflow-hidden border border-white/10 bg-slate-800 flex items-center justify-center">
+              {messageAvatar ? (
+                <img 
+                  src={messageAvatar} 
+                  className="w-full h-full object-cover" 
+                  alt="" 
+                />
+              ) : (
+                <User className="w-5 h-5 text-white/40" />
+              )}
+            </div>
+            <div className="mic-badge">
+              <Mic className="w-2.5 h-2.5" />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Renders the full content of a message bubble
+  const renderMessageContent = (msg: InboxMessage) => {
+    const isAudio = msg.media_type?.startsWith("audio") || msg.media_type?.includes("ogg") || msg.media_type?.includes("mpeg");
+    const isImage = msg.media_type?.startsWith("image");
+    const isPdf   = msg.media_type?.includes("pdf");
+    const isVideo = msg.media_type?.startsWith("video");
+    const isDoc   = msg.media_url && !isAudio && !isImage && !isPdf && !isVideo;
+
+    // Improved filename detection prioritizing stored file_name
+    const getFileName = () => {
+      if (msg.file_name) return msg.file_name;
+      if (isPdf) return "documento.pdf";
+      const ext = msg.media_type?.split("/")[1] || "arquivo";
+      return `arquivo.${ext}`;
+    };
+
+    return (
+      <div className="w-full flex flex-col">
+        {/* Forwarded badge */}
+        {msg.forwarded && (
+          <div className="forwarded-indicator">
+            <Forward className="w-3 h-3 rotate-180 scale-x-[-1]" />
+            <span>Encaminhada</span>
+          </div>
+        )}
+
+        {/* Sender Info for Groups (Styled Teal label) */}
+        {!msg.direction?.includes("outbound") && msg.sender_name && (
+          <div className="whatsapp-sender-name">{msg.sender_name}</div>
+        )}
+
+        {/* Image */}
+        {isImage && msg.media_url && (
+          <div className="mb-2 rounded-2xl overflow-hidden shadow-md border border-white/10 cursor-pointer group relative">
+            <img src={msg.media_url} alt="Mídia" className="max-w-full h-auto object-cover transition-transform group-hover:scale-105" />
+          </div>
+        )}
+
+        {/* Audio player */}
+        {isAudio && msg.media_url && (
+          <VoiceMessage msg={msg} direction={msg.direction || "inbound"} />
+        )}
+
+        {/* PDF / Document card (Integrated look) */}
+        {(isPdf || isDoc) && msg.media_url && (
+          <div className="media-card-premium mb-2">
+            <div className="media-card-header">
+              <img src="/placeholder-doc-header.png" alt="" />
+              <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                 <FileText className="w-10 h-10 text-white/50" />
+              </div>
+            </div>
+            <div className="flex items-center gap-3 p-3">
+              <div className="w-10 h-10 rounded-lg bg-red-500/20 flex items-center justify-center shrink-0">
+                <div className="w-6 h-6 bg-red-600 rounded flex items-center justify-center text-[8px] font-bold text-white">PDF</div>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[12px] font-bold truncate leading-tight">{getFileName()}</p>
+                <p className="text-[10px] opacity-40 uppercase font-medium">PDF • {(Math.random() * 5 + 1).toFixed(1)} MB</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Text content with linkified URLs */}
+        {msg.content && !["🎤 Áudio","🎥 Vídeo","📷 Imagem","📄 PDF","📎 Arquivo"].includes(msg.content) && (
+          <p className="text-sm leading-relaxed whitespace-pre-wrap">
+            {linkifyText(msg.content)}
+          </p>
+        )}
+
+        {/* Integrated Timestamp */}
+        {msg.created_at && (
+          <div className="message-timestamp-inside">
+            {format(new Date(msg.created_at), "HH:mm")}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+
   if (loading) {
     return (
       <div className="flex h-[calc(100vh-64px)] items-center justify-center">
@@ -166,12 +390,12 @@ const InboxPage = () => {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-64px)] w-full overflow-hidden">
-      <div className="flex flex-1 w-full bg-card overflow-hidden">
+    <div className="flex flex-col h-[calc(100vh-64px)] w-full overflow-hidden bg-slate-50/50 dark:bg-slate-950/20">
+      <div className="flex flex-1 w-full overflow-hidden">
         {/* Conversation List */}
-        <div className="w-[360px] border-r flex flex-col bg-background/50">
-          <div className="p-4 border-b space-y-3">
-            <h2 className="font-semibold text-lg">Inbox WhatsApp</h2>
+        <div className="w-[380px] border-r flex flex-col bg-slate-100/40 dark:bg-slate-900/40 backdrop-blur-sm">
+          <div className="p-6 border-b space-y-4">
+            <h2 className="font-bold text-xl tracking-tight">Inbox WhatsApp</h2>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
@@ -182,14 +406,18 @@ const InboxPage = () => {
               />
             </div>
           </div>
-          <div className="flex-1 overflow-y-auto custom-scrollbar">
+          <div className="flex-1 overflow-y-auto custom-scrollbar p-2">
             {filtered.map((conv) => (
               <motion.button
                 key={conv.id}
                 onClick={() => handleSelectConversation(conv.id)}
-                className={`w-full text-left p-4 border-b border-border/30 transition-all ${selectedId === conv.id ? "bg-accent/5 border-l-2 border-l-accent" : "hover:bg-muted/30"}`}
+                className={`w-full text-left p-4 rounded-xl mb-1 transition-all duration-200 ${
+                  selectedId === conv.id 
+                    ? "bg-white dark:bg-slate-800 shadow-sm border-l-4 border-l-accent ring-1 ring-black/5" 
+                    : "hover:bg-slate-200/50 dark:hover:bg-slate-800/30"
+                }`}
               >
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-4">
                   <div className="relative w-11 h-11 shrink-0">
                     <div className="w-full h-full rounded-full bg-primary/5 border border-border flex items-center justify-center text-sm font-semibold overflow-hidden">
                       {conv.contact?.avatar_url ? (
@@ -228,11 +456,11 @@ const InboxPage = () => {
         </div>
 
         {/* Chat Area */}
-        <div className="flex-1 flex flex-col relative bg-background/20 overflow-hidden">
+        <div className="flex-1 flex flex-col relative bg-white/30 dark:bg-slate-900/20 overflow-hidden">
           {selected ? (
             <>
               {/* Chat Header */}
-              <div className="p-4 border-b glass-panel flex items-center justify-between z-10 bg-background/80 backdrop-blur-md shrink-0">
+              <div className="px-6 py-4 border-b glass-panel flex items-center justify-between z-10 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl shrink-0 shadow-sm">
                 <div 
                   className="flex items-center gap-3 cursor-pointer hover:bg-muted/50 p-1 rounded-lg transition-colors"
                   onClick={() => setShowDetails(true)}
@@ -284,76 +512,95 @@ const InboxPage = () => {
               {/* Messages Area - ONLY THIS SCROLLS */}
               <div className="flex-1 overflow-y-auto p-6 space-y-3 bg-background/40 custom-scrollbar">
                 <AnimatePresence>
-                  {messages.map((msg, i) => (
-                    <motion.div
-                      key={msg.id}
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: i * 0.01 }}
-                      className={`flex ${msg.direction === "outbound" ? "justify-end" : "justify-start"}`}
-                    >
-                      <div className={msg.direction === "outbound" ? "chat-bubble-outbound" : "chat-bubble-inbound"}>
-                        {msg.media_url && msg.media_type?.startsWith("image/") ? (
-                          <div className="mb-2 rounded-xl overflow-hidden shadow-sm border border-white/10 cursor-pointer" onClick={() => { /* Lightbox potential override */ }}>
-                            <img src={msg.media_url} alt="Mídia" className="max-w-[240px] max-h-[300px] object-cover" />
+                  {messages.map((msg, i) => {
+                    const isGroup = selected?.channel === "whatsapp" && selected.contact?.source === "whatsapp_group";
+                    const prevMsg = messages[i - 1];
+                    const isSequential = prevMsg && prevMsg.phone === msg.phone && prevMsg.sender_name === msg.sender_name;
+                    const isOutbound = msg.direction === "outbound";
+                    
+                    return (
+                      <motion.div
+                        key={msg.id}
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className={`flex ${isOutbound ? "justify-end" : "justify-start"} ${isSequential ? "mt-[-8px]" : "mt-2"}`}
+                      >
+                        <div className="flex items-end gap-2 max-w-[85%]">
+                          {/* Group Chat Avatar (Only show for first sequential inbound msg) */}
+                          {!isOutbound && isGroup && (
+                            <div className="w-8 shrink-0">
+                              {!isSequential && (
+                                <div className="avatar-mini overflow-hidden bg-primary/10">
+                                  {msg.sender_avatar ? (
+                                    <img src={msg.sender_avatar} className="w-full h-full object-cover" alt="" />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center text-[10px] font-bold text-primary opacity-40">
+                                      {msg.sender_name?.slice(0, 1) || "?"}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          <div className={`whatsapp-bubble-dark ${isOutbound ? "whatsapp-outbound" : "whatsapp-inbound"}`}>
+                            {/* Hide sender name if sequential */}
+                            {renderMessageContent({
+                              ...msg,
+                              sender_name: isGroup && !isSequential && !isOutbound ? msg.sender_name : null
+                            })}
                           </div>
-                        ) : msg.media_url ? (
-                          <div className="mb-2 p-2 rounded-xl bg-black/10 border border-white/10 text-xs flex flex-col gap-1">
-                            🗂️ Arquivo Recebido
-                            <a href={msg.media_url} target="_blank" rel="noreferrer" className="underline opacity-80 hover:opacity-100">Baixar</a>
-                          </div>
-                        ) : null}
-                        {msg.content && <p className="text-sm leading-relaxed">{msg.content}</p>}
-                        {msg.created_at && (
-                          <p className={`text-[10px] mt-1.5 ${msg.direction === "outbound" ? "text-primary-foreground/50 text-right" : "text-muted-foreground"}`}>
-                            {format(new Date(msg.created_at), "HH:mm")}
-                          </p>
-                        )}
-                      </div>
-                    </motion.div>
-                  ))}
+                        </div>
+                      </motion.div>
+                    );
+                  })}
                 </AnimatePresence>
                 <div ref={chatEndRef} />
               </div>
 
-              {/* Input Area - FIXED AT BOTTOM */}
-              <div className="p-4 border-t glass-panel flex gap-3 items-center bg-background/80 backdrop-blur-md shrink-0">
-                <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} />
-                
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="rounded-full h-10 w-10 shrink-0 hover:bg-muted">
-                      <Plus className="w-5 h-5 opacity-60" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-48 rounded-2xl p-2 mb-2 shadow-xl border-border/40 backdrop-blur-xl">
-                    <DropdownMenuItem className="rounded-xl gap-3 py-2.5 cursor-pointer" onClick={() => fileInputRef.current?.click()}>
-                      <ImageIcon className="w-4 h-4 text-blue-500" />
-                      <span className="text-sm">Fotos e vídeos</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem className="rounded-xl gap-3 py-2.5 cursor-pointer" onClick={() => fileInputRef.current?.click()}>
-                      <FileIcon className="w-4 h-4 text-purple-500" />
-                      <span className="text-sm">Documento</span>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+              <div className="p-6 pt-2 shrink-0">
+                <div className="px-4 py-3 rounded-2xl flex gap-3 items-center bg-white dark:bg-slate-900 shadow-xl border border-border/50 backdrop-blur-xl">
+                  <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} />
+                  
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="rounded-full h-10 w-10 shrink-0 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                        <Plus className="w-5 h-5 text-slate-600 dark:text-slate-400" strokeWidth={2.5} />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56 rounded-2xl p-2 mb-4 shadow-2xl border-border/40 backdrop-blur-2xl">
+                      <DropdownMenuItem className="rounded-xl gap-4 py-3 cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+                        <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center">
+                          <ImageIcon className="w-4 h-4 text-blue-500" />
+                        </div>
+                        <span className="font-medium text-sm">Fotos e vídeos</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem className="rounded-xl gap-4 py-3 cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+                        <div className="w-8 h-8 rounded-full bg-indigo-500/10 flex items-center justify-center">
+                          <FileIcon className="w-4 h-4 text-indigo-500" />
+                        </div>
+                        <span className="font-medium text-sm">Documento</span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
 
-                <Input
-                  placeholder="Digite uma mensagem..."
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  disabled={sending}
-                  className="flex-1 rounded-2xl glass-input border-0 h-11 px-4 text-sm focus-visible:ring-1 focus-visible:ring-accent/30"
-                />
-                <Button
-                  size="icon"
-                  className="rounded-full h-11 w-11 shadow-md bg-accent hover:bg-accent/90 shrink-0"
-                  onClick={handleSend}
-                  disabled={sending || !newMessage.trim()}
-                >
-                  <Send className="w-4 h-4" />
-                </Button>
+                  <Input
+                    placeholder="Digite uma mensagem..."
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    disabled={sending}
+                    className="flex-1 rounded-xl bg-transparent border-0 h-11 px-2 text-sm focus-visible:ring-0 placeholder:text-slate-400"
+                  />
+                  <Button
+                    size="icon"
+                    className="rounded-full h-11 w-11 shadow-lg bg-accent hover:bg-accent/90 shrink-0 transform active:scale-95 transition-all text-accent-foreground"
+                    onClick={handleSend}
+                    disabled={sending || !newMessage.trim()}
+                  >
+                    <Send className="w-4 h-4" strokeWidth={2.5} />
+                  </Button>
+                </div>
               </div>
             </>
           ) : (
